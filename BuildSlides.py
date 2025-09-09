@@ -216,8 +216,8 @@ def result_to_string(result:CodeResult, wants:str) -> str:
     if wants not in wants_options:
         raise RuntimeError(f"Unknown wants value: {wants}, expected one of {', '.join(wants_options)}")
     
-    if wants == "compile": return "rayjs-compiling" if result.compiles else "reyjs-not-compiling"
-    if wants == "run": return "rayjs-running" if result.runs else "reyjs-erroring"
+    if wants == "compile": return "rayjs-compiling" if result.compiles else "rayjs-not-compiling"
+    if wants == "run": return "rayjs-running" if result.runs else "rayjs-erroring"
 
 type Code = str
 type Markdown = str
