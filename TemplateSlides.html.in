@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+		<title>reveal.js</title>
+
+		<link rel="stylesheet" href="@__REVEAL_JS_PATH__@dist/reset.css">
+		<link rel="stylesheet" href="@__REVEAL_JS_PATH__@dist/reveal.css">
+		<link rel="stylesheet" href="@__REVEAL_JS_PATH__@dist/theme/black.css">
+
+		<!-- Theme used for syntax highlighted code -->
+		<link rel="stylesheet" href="@__REVEAL_JS_PATH__@plugin/highlight/monokai.css">
+		<style>
+		.rayjs-compiling { border-style: solid; border-color: green;      border-width: .1em;}
+		.rayjs-not-compiling { border-style: solid; border-color: red;    border-width: .1em;}
+		.rayjs-running { border-style: solid; border-color: green green;  border-width: .1em;}
+		.rayjs-erroring { border-style: solid; border-color: green red;   border-width: .1em;}
+		</style>
+	</head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+				<section data-markdown data-separator-vertical="^\[\/\/\].*\(Vertical slide\)">
+				<textarea data-template class="r-fit-text">
+@__MARKDOWN INPUT__@
+				</textarea>
+</section>
+			</div>
+		</div>
+
+		<script src="@__REVEAL_JS_PATH__@dist/reveal.js"></script>
+		<script src="@__REVEAL_JS_PATH__@plugin/notes/notes.js"></script>
+		<script src="@__REVEAL_JS_PATH__@plugin/markdown/markdown.js"></script>
+		<script src="@__REVEAL_JS_PATH__@plugin/highlight/highlight.js"></script>
+		<script>
+			Reveal.initialize({
+				hash: true,
+				plugins: [ RevealMarkdown, RevealHighlight, RevealNotes ]
+			});
+		</script>
+	</body>
+</html>
