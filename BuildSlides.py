@@ -1,5 +1,5 @@
 
-from typing import Protocol, Callable, LiteralString, override, Final
+from typing import Protocol, Callable, LiteralString, override, Final, Iterable
 from dataclasses import dataclass
 import subprocess
 from os import getenv as get_env
@@ -246,7 +246,10 @@ def template_file_setup(base_template_file:str, reveal_js_path:str) -> str:
 
 def fill_output_template(input_markdown:str, template_file:str, output_file_name:str) -> None:
     with open(output_file_name, "w") as out_file:
-        out_file.write(template_file.replace("@__MARKDOWN INPUT__@", input_markdown))
+        out_file.write(
+            template_file.replace("@__MARKDOWN INPUT__@", input_markdown) # fill in markdown
+            .replace("@__TITLE__@", output_file_name.rsplit(".", 1)[0])   # give it a good title
+        )
 
 def _get_git_path() -> str:
     if try_executable("git"): return "git"
@@ -285,6 +288,24 @@ def create_markdown_file(input_file_name:str, *,
     template_half_filled = template_file_setup(template_file_name, reveal_js_path)
     fill_output_template(new_markdown_data, template_half_filled, output_file_name)
 
+def create_contents_index(to_link_to:Iterable[str]) -> None:
+    links = [f'<li><a href="{link}.html">{link}</a></li>' for link in to_link_to]
+    links_str = "\n".join(links)
+    with open("index.html", "w") as index_file:
+        index_file.write(
+f"""
+<html>
+    <body>
+        <h1>Contents Of Slides</h1>
+        <ul>
+            {links_str}
+        </ul>
+    </body>
+</html>
+"""
+        )
+
+
 _HELP = (
 """
 Create slides from markdown file with code blocks that can be compiled and executed.
@@ -313,13 +334,17 @@ def main() -> None:
     if args.help:
         print(_HELP)
         exit(1)
-    # Allow *.md, use set to only do each file once
-    # print(f"{args.input_files=}")
+
     input_files:set[str] = {f for f in args.input_files if os.path.isfile(f) and f.endswith(".md")}
-    # print(input_files)
-    
+    single_file = True
+    if len(input_files) != 1:
+        single_file = False
+        # Create an index.html file if one would otherwise not be created
+        if not os.path.exists("index.html"):
+            create_contents_index(input_files)
+
     for input_file in input_files:
-        output_file = args.output if len(input_files) == 1 else input_file.rsplit(".", 1)[0] + ".html"
+        output_file = args.output if single_file else input_file.rsplit(".", 1)[0] + ".html"
         print(f"Processing {input_file} to {output_file} using template {args.template}")
         create_markdown_file(input_file, template_file_name=args.template, output_file_name=output_file, reveal_js_path=args.reveal_js_path)
 
