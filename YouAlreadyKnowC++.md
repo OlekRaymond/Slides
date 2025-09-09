@@ -55,7 +55,7 @@ import ctypes
 size_t = ctypes.c_size_t
 int32 = ctypes.c_int32
 size_of_list = 10
-size_of_list_bytes = (32/8) * size_of_list
+size_of_list_bytes = size_t((32//8) * size_of_list)
 libc = ctypes.CDLL("libc_malloc_debug.so")
 data_ptr = libc.malloc(size_of_list_bytes)
 ```
@@ -278,12 +278,11 @@ The `constexpr` keyword was introduced in C++11 and runs code at compile time*. 
 [//]: # (Vertical slide)
 
 ```C++
-constexpr int add_one(int in) {
-	return in + 1;
-}
-
-constexpr auto i = add_one(std::numeric_limits<int>::max());
+constexpr auto max_int = std::numeric_limits<int>::max();
+constexpr auto i = max_int + 1;
 ```
+<!-- .element: class="unknown" wants="compiles" -->
+
 Gives error:
 ```
 error: overflow in constant expression [-fpermissive]

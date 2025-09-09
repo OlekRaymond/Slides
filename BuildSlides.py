@@ -5,6 +5,7 @@ import subprocess
 from os import getenv as get_env
 import os
 import re
+import traceback
 
 # parse slides
 # if code block:
@@ -170,8 +171,9 @@ def handle_cpp(code:str, debug_value:str |None = None) -> CodeResult:
     source_file_name = f"{file_name}.cpp"
     # obj_file_name = f"{file_name}.obj"
     exe_file_name = f"{file_name}"
-    with open("template.cpp.in", "r") as template, open(source_file_name, "w") as output:
-        output.write(template.read().replace("@input@", code))
+    source = r"int main() {" f"\n{code}\n" "}" if "main" not in code else code
+    with open(source_file_name, "w") as output:
+        output.write(source)
     # if compile only use "-c" in the following command, we test compiling and linking for now 
     res = subprocess.run((_CPP_COMPILER, "-o" f"{exe_file_name}" , source_file_name), stderr=subprocess.PIPE)
     compile_result = CompileResult(str(res.stderr), res.returncode )
@@ -187,9 +189,9 @@ def handle_python(code:str) -> CodeResult:
     print_result:str = ""
     exit_code:int = 0
     exit_str:str = ""
-    def mock_print(*value:object):
+    def mock_print(*value:object, end:str="\n"):
         nonlocal print_result
-        print_result += str(value[0])
+        print_result += "".join((str(v) for v in value)) + end
     def mock_exit(value:int|str):
         nonlocal exit_code
         nonlocal exit_str
@@ -203,7 +205,8 @@ def handle_python(code:str) -> CodeResult:
         exec(code, {"print": mock_print, "exit":mock_exit})
         return CodeResult(None, RunResult(print_result + exit_str, exit_code))
     except Exception as e:
-        return CodeResult(None, RunResult(print_result + e.__repr__(), 1))
+        unwrapped_exception:list[str] = traceback.format_exception(e)
+        return CodeResult(None, RunResult(print_result + "".join(unwrapped_exception), 1))
 
 handle_code._default_handler.add_language("Cpp", handle_cpp)
 handle_code._default_handler.add_language("C++", handle_cpp)
@@ -212,12 +215,11 @@ handle_code._default_handler.add_language("py", handle_python)
 
 def result_to_string(result:CodeResult, wants:str) -> str:
     wants = wants.lower()
-    wants_options = ("compile", "run")
-    if wants not in wants_options:
-        raise RuntimeError(f"Unknown wants value: {wants}, expected one of {', '.join(wants_options)}")
-    
-    if wants == "compile": return "rayjs-compiling" if result.compiles else "rayjs-not-compiling"
-    if wants == "run": return "rayjs-running" if result.runs else "rayjs-erroring"
+    wants_options_compile = ("compile", "compiles", "compiling")
+    wants_options_run = ("run", "running", "erroring")
+    if wants in wants_options_compile: return "rayjs-compiling" if result.compiles else "rayjs-not-compiling"
+    if wants in wants_options_run: return "rayjs-running" if result.runs else "rayjs-erroring"
+    raise Exception(f"wants was ignored: {wants} was not one of {', '.join(wants_options_compile + wants_options_run)}")
 
 type Code = str
 type Markdown = str
