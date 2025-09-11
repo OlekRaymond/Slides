@@ -117,9 +117,9 @@ for (auto a : A) { code(a); }
 
 ---
 
-## I can't use the standard library
+## When you can't use std
 
-Usually because "my input doesn't allow it".
+Usually because the input is different to the standard, such as a `char*` instead of a `std::string`.
 
 <sub><sup>There are other reasons, some valid, but advice is similar regardless.</sup></sub>
 
@@ -179,13 +179,14 @@ struct C {
 
 struct D : C<D> { };
 
-void f(D *d) { d->foo(); }
+void f(D& d) { d.foo(); }
 
 int main() {
     D d{};
-    f(&d);
+    f(d);
 }
 ```
+<!-- .element: class="erroring" wants="run" -->
 
 [//]: # (Vertical slide)
 
@@ -278,8 +279,11 @@ The `constexpr` keyword was introduced in C++11 and runs code at compile time*. 
 [//]: # (Vertical slide)
 
 ```C++
-constexpr auto max_int = std::numeric_limits<int>::max();
-constexpr auto i = max_int + 1;
+#include <limits>
+int main() {
+    constexpr auto max_int = std::numeric_limits<int>::max();
+    constexpr auto i = max_int + 1;
+}
 ```
 <!-- .element: class="unknown" wants="compiles" -->
 
@@ -287,6 +291,20 @@ Gives error:
 ```
 error: overflow in constant expression [-fpermissive]
 ```
+
+[//]: # (Vertical slide)
+
+Whereas the non-constexpr version will compile
+```C++
+#include <limits>
+int main() {
+    auto max_int = std::numeric_limits<int>::max();
+    auto i = max_int + 1;
+}
+```
+<!-- .element: class="unknown" wants="compiles" -->
+
+<sub><sup>(and invoke UB at runtime)</sup></sub>
 
 [//]: # (Vertical slide)
 
@@ -309,16 +327,21 @@ void foo(int& in) {
 	in += 1;
 }
 
-// We know that a is always valid in this scope
-int a = 1;
-foo(a);
+int main() {
+    // We know that a is always valid in this scope
+    int a = 1;
+    foo(a);
+}
 ```
+<!-- .element: class="unknown" wants="runs" -->
 Here `a` goes through `foo` as argument `in`, we know the whole time it's safe.
 
 
 [//]: # (Vertical slide)
 
-Following the above statement, we (and the compiler) know that any local data inside the function we want to end up outside of the local scope must be moved (or copied) to that outer scope. So:
+Following the above statement, we (and the compiler) know that any local data inside the function we want to end up outside of the local scope __must__ be __moved__ (or copied) to that outer scope.
+
+So `return` **must** do a move or copy
 ```C++
 int foo(int& in) {
 	int i = 1;
@@ -338,11 +361,16 @@ NoMove foo() {
 
 [//]: # (Vertical slide)
 
-If we do something silly like:
+If we do something silly to avoid this, like:
 ```C++
 int& foo() { return 1; }
 ```
-the compiler errors. If we are more determined about our silliness,
+<!-- .element: class="not-compiling" wants="compile" -->
+the compiler errors. 
+
+[//]: # (Vertical slide)
+
+If we are more determined about our silliness,
 ```C++
 int& foo() { int i = 0; return i}
 ```
@@ -362,33 +390,48 @@ Leveraging this idea we can create a guideline:
 
 [//]: # (Vertical slide)
 
-Though sometimes we want to return references so lets amend this:
+Though sometimes we want to return references so lets amend it:
 
 > Functions that return a reference should delete the appropriate overloads where the object they are referencing goes out of scope.
 
 [//]: # (Vertical slide)
 
 ```C++
-int& GetGreatest(const std::vector<int> input) {
-     int max = 0;
-     size_t index_of_max = 0;
-     for (size_t i = 0; const auto& value : input) {
-         if (max > value) { max = value; index_of_max = i; }
-     }
-     return input[max];
+#include <vector>
+int& GetGreatest(std::vector<int>& input) {
+    int max = 0;
+    size_t index_of_max = 0;
+    size_t i = 0;
+    for (auto& value : input) {
+        if (max > value) {
+            max = value;
+            index_of_max = i;
+        }
+        ++i;
+    }
+    return input[max];
+}
+
+int main() {
+    std::vector<int> input{1,2,3,5};
+    int& greatest = GetGreatest(input);
 }
 ```
-Returns a reference to an object that was
+<!-- .element: class="compiling" wants="compiles" -->
+Returns a reference to an object that was in the input vector
 
-We can normally see structs or classes (the same thing) as a very similar extension of this concept:
+[//]: # (Vertical slide)
+
+We can normally see structs (or classes) as a very similar extension of this concept:
 ```C++
 struct IntRefWrapper {
-	IntRefWrapper(int& wrappedInt) : m_wrappedInt{wrappedInt} {}
-	int& m_wrappedInt;
+    IntRefWrapper(int& wrappedInt) : m_wrappedInt{wrappedInt} {}
+    int& m_wrappedInt;
 };
 
-{
-	int a = 1;
-	IntRefWrapper b{a};
+int main() {
+    int a = 1;
+    IntRefWrapper b{a};
 }
 ```
+<!-- .element: class="unknown" wants="running" -->

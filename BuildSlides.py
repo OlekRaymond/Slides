@@ -6,6 +6,7 @@ from os import getenv as get_env
 import os
 import re
 import traceback
+import base64
 
 # parse slides
 # if code block:
@@ -16,46 +17,9 @@ import traceback
 #       compile
 #       if compiles: green; else red;
 
-
-markdown_to_parse = """
-```C++
-/* compiles */
-```
-```C++
-does not compile
-```
-```Cpp
-/* compiles */
-```
-```Cpp
-does not compile
-```
-# heading one
-## heading two
----
-something else
-```py
-print(1)
-```
-```Python
-assert false
-```
-```py
-exit(2)
-```
-```Py
-exit("good bye")
-```
-"""
-# parsed_markdown = parser.parse(markdown_to_parse)
-
-# def filter_code(markdown:list["markdown_it.token.Token"]):
-#     for token in markdown:
-#         if token.tag == "code":
-#             yield token
-#         if token.children:
-#             child_code = filter_code(token.children)
-#             yield from child_code
+type Code = str
+type Markdown = str
+type HTML = str
 
 @dataclass
 class CompileResult:
@@ -72,22 +36,14 @@ class RunResult:
     def runs(self): return self.return_code == 0
 
 @dataclass
-class LinkResult:
-    link_output: str
-    return_code: int
-    @property
-    def links(self): return self.return_code == 0
-
-@dataclass
 class CodeResult:
     compile_result: CompileResult | None
-    # link_result: LinkResult | None
     run_result: RunResult | None
     @property
     def compiles(self) -> bool:
         if self.compile_result is not None: return self.compile_result.compiles
         if self.run_result is not None: return self.run_result.runs
-        return False # ?
+        raise RuntimeError("CodeResult has neither compile_result nor run_result, assumed bug")
     @property
     def runs(self) -> bool:
         if self.run_result is not None: return self.run_result.runs
@@ -110,7 +66,6 @@ class RuntimeLanguage:
         return self._value.__hash__()
 
 type Handler  = Callable[[str], CodeResult]
-# type RuntimeLanguage = str
 type Language = LiteralString | RuntimeLanguage
 
 class CodeHandlerRegistry(Protocol):
@@ -121,6 +76,7 @@ class CodeHandlerRegistry(Protocol):
 class DefaultHandler(CodeHandlerRegistry):
     def __init__(self):
         self.registry: dict[RuntimeLanguage, Handler] = {}
+
     @override
     def add_language(self, language:LiteralString, handler:Handler) -> "DefaultHandler":
         self.registry.update({RuntimeLanguage(str(language)): handler})
@@ -137,11 +93,11 @@ class DefaultHandler(CodeHandlerRegistry):
                 )
         return handler(code)
 
-def handle_code(language: Language, code:str, handler_registry: CodeHandlerRegistry | None = None):
-    handler: CodeHandlerRegistry = handle_code._default_handler if handler_registry is None else handler_registry
-    return handler.handle_code(language, code)
+_DEFAULT_HANDLER:Final = DefaultHandler()
 
-handle_code._default_handler = DefaultHandler()
+def handle_code(language: RuntimeLanguage, code:str, handler_registry: CodeHandlerRegistry | None = None):
+    handler: CodeHandlerRegistry = _DEFAULT_HANDLER if handler_registry is None else handler_registry
+    return handler.handle_code(language, code)
 
 def try_executable(exe_path:str) -> bool:
     res = subprocess.run((exe_path, "--version"), stdout=subprocess.DEVNULL)
@@ -165,9 +121,16 @@ def _get_cpp_compiler() -> str:
 
 _CPP_COMPILER:str = _get_cpp_compiler()
 
-def handle_cpp(code:str, debug_value:str |None = None) -> CodeResult:
-    handle_cpp._counter += 1
-    file_name = debug_value if debug_value is not None else f"build/main_{handle_cpp._counter}"
+def _create_unique_file_name(code:Code) -> str:
+    """
+    create a unique file name based on the hash of the code
+    """
+    b64_hash = base64.b64encode((code.__hash__().to_bytes(8, signed=True))).decode("utf-8")
+    print(b64_hash)
+    return b64_hash.replace("=", "").replace("/", "").replace("+", "")
+    
+def handle_cpp(code:Code) -> CodeResult:
+    file_name = f"build/{_create_unique_file_name(code)}"
     source_file_name = f"{file_name}.cpp"
     # obj_file_name = f"{file_name}.obj"
     exe_file_name = f"{file_name}"
@@ -178,12 +141,9 @@ def handle_cpp(code:str, debug_value:str |None = None) -> CodeResult:
     res = subprocess.run((_CPP_COMPILER, "-o" f"{exe_file_name}" , source_file_name), stderr=subprocess.PIPE)
     compile_result = CompileResult(str(res.stderr), res.returncode )
     if res.returncode != 0: return CodeResult(compile_result=compile_result, run_result=None)
-    # breakpoint()
     res = subprocess.run((f"./{exe_file_name}"), stderr=subprocess.PIPE)
     run_result = RunResult(str(res.stderr), res.returncode)
     return CodeResult(run_result=run_result, compile_result=compile_result)
-
-handle_cpp._counter = 0
 
 def handle_python(code:str) -> CodeResult:
     print_result:str = ""
@@ -208,21 +168,18 @@ def handle_python(code:str) -> CodeResult:
         unwrapped_exception:list[str] = traceback.format_exception(e)
         return CodeResult(None, RunResult(print_result + "".join(unwrapped_exception), 1))
 
-handle_code._default_handler.add_language("Cpp", handle_cpp)
-handle_code._default_handler.add_language("C++", handle_cpp)
-handle_code._default_handler.add_language("Python", handle_python)
-handle_code._default_handler.add_language("py", handle_python)
+_DEFAULT_HANDLER.add_language("Cpp", handle_cpp)
+_DEFAULT_HANDLER.add_language("C++", handle_cpp)
+_DEFAULT_HANDLER.add_language("Python", handle_python)
+_DEFAULT_HANDLER.add_language("py", handle_python)
 
 def result_to_string(result:CodeResult, wants:str) -> str:
     wants = wants.lower()
     wants_options_compile = ("compile", "compiles", "compiling")
-    wants_options_run = ("run", "running", "erroring")
+    wants_options_run = ("run", "running", "erroring", "runs")
     if wants in wants_options_compile: return "rayjs-compiling" if result.compiles else "rayjs-not-compiling"
-    if wants in wants_options_run: return "rayjs-running" if result.runs else "rayjs-erroring"
+    if wants in wants_options_run: return "rayjs-running" if result.runs else ("rayjs-erroring" if result.compiles else "rayjs-not-compiling")
     raise Exception(f"wants was ignored: {wants} was not one of {', '.join(wants_options_compile + wants_options_run)}")
-
-type Code = str
-type Markdown = str
 
 _FIND_CODE_PATTERN = r"(?:^```)(?P<lang>[A-Za-z+]{2,10})(?:.{0,20})$(?:\r?\n)(?P<code>(?:[^\`]){3,}?)(?:```$\n)(?:\<\!\-\- \.element: class=\")(?P<outclass>[A-Za-z0-9\-_]*?)(?:\")(?:\s?wants=\")(?P<outwants>[A-Za-z0-9\-_]*?)(?:\" \-\-\>)"
 _COMPILED_REGEX = re.compile(_FIND_CODE_PATTERN, re.MULTILINE)
@@ -246,11 +203,12 @@ def template_file_setup(base_template_file:str, reveal_js_path:str) -> str:
     with open(base_template_file, "r") as template_file:
         return template_file.read().replace("@__REVEAL_JS_PATH__@", reveal_js_path)
 
-def fill_output_template(input_markdown:str, template_file:str, output_file_name:str) -> None:
+def fill_output_template(input_markdown:Markdown, template_file:HTML, output_file_name:str, *, title:str|None=None) -> None:
+    title = title if title is not None else output_file_name.rsplit(".", 1)[0]
     with open(output_file_name, "w") as out_file:
         out_file.write(
             template_file.replace("@__MARKDOWN INPUT__@", input_markdown) # fill in markdown
-            .replace("@__TITLE__@", output_file_name.rsplit(".", 1)[0])   # give it a good title
+            .replace("@__TITLE__@", title)   # give it a good title
         )
 
 def _get_git_path() -> str:
@@ -288,7 +246,7 @@ def create_markdown_file(input_file_name:str, *,
         markdown_file_data = in_file.read()
         new_markdown_data = for_each_code_block(markdown_file_data, handle_code)
     template_half_filled = template_file_setup(template_file_name, reveal_js_path)
-    fill_output_template(new_markdown_data, template_half_filled, output_file_name)
+    fill_output_template(new_markdown_data, template_half_filled, output_file_name, title=input_file_name.rsplit(".", 1)[0])
 
 def create_contents_index(to_link_to:Iterable[str]) -> None:
     links = [f'<li><a href="{link}.html">{link}</a></li>' for link in to_link_to]
@@ -308,34 +266,14 @@ f"""
         )
 
 
-_HELP = (
-"""
-Create slides from markdown file with code blocks that can be compiled and executed.
-Usage: BuildSlides.py [options] <input_markdown_files>
-Options:
--t --template <template_file>
-    Specify the template file to use. Default is TemplateSlides.html.in
--o --output <output_file>
-    Specify the output file name. Default is index.html
-input_markdown_files
-    One or more markdown files to process.
--h --help
-    Show this help message.
-"""
-)
-
 def main() -> None:
     import argparse
-    arg_parser = argparse.ArgumentParser(description="Create slides from markdown file with code blocks that can be compiled and executed.", add_help=False)
-    arg_parser.add_argument("input_files", metavar="input_markdown_files", type=str, nargs="+", help="One or more markdown files to process.")
+    arg_parser = argparse.ArgumentParser(description="Create slides from markdown file with code blocks that can be compiled and executed.", add_help=True)
+    arg_parser.add_argument("input_files", metavar="input_markdown_files", type=str, nargs="+", help="markdown files to process, wildcards are allowed")
     arg_parser.add_argument("-t", "--template", type=str, default="TemplateSlides.html.in", help="Specify the template file to use. Default is TemplateSlides.html.in")
-    arg_parser.add_argument("-o", "--output", type=str, default="index.html", help="Specify the output file name. Default is index.html")
-    arg_parser.add_argument("-r", "--reveal-js-path", type=str, default=_REVEAL_JS_PATH, help="Path to reveal.js folder or CDN URL. Default is to clone reveal.js repo.")
-    arg_parser.add_argument("-h", "--help", action="store_true", help="Show this help message.") 
+    arg_parser.add_argument("-o", "--output", type=str, default="index.html", help="Specify the output file name if only one filename is given.\n Default is index.html")
+    arg_parser.add_argument("-r", "--reveal-js-path", type=str, default=_REVEAL_JS_PATH, help="Path to reveal.js folder.\n Defaults to cloning the reveal.js repo in build/reveal_js.")
     args = arg_parser.parse_args()
-    if args.help:
-        print(_HELP)
-        exit(1)
 
     input_files:set[str] = {f for f in args.input_files if os.path.isfile(f) and f.endswith(".md")}
     single_file = True
