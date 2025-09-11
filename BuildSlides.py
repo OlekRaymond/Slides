@@ -273,9 +273,10 @@ def main() -> None:
     arg_parser.add_argument("-t", "--template", type=str, default="TemplateSlides.html.in", help="Specify the template file to use. Default is TemplateSlides.html.in")
     arg_parser.add_argument("-o", "--output", type=str, default="index.html", help="Specify the output file name if only one filename is given.\n Default is index.html")
     arg_parser.add_argument("-r", "--reveal-js-path", type=str, default=_REVEAL_JS_PATH, help="Path to reveal.js folder.\n Defaults to cloning the reveal.js repo in build/reveal_js.")
+    arg_parser.add_argument("-i", "--ignore", type=str, default="", help="glob pattern of files to ignore, useful for READMEs, defaults to nothing")
     args = arg_parser.parse_args()
 
-    input_files:set[str] = {f for f in args.input_files if os.path.isfile(f) and f.endswith(".md")}
+    input_files:set[str] = {f for f in args.input_files if os.path.isfile(f) and (f not in args.ignore)}
     single_file = True
     if len(input_files) != 1:
         single_file = False
