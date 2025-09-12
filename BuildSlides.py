@@ -175,7 +175,7 @@ _DEFAULT_HANDLER.add_language("py", handle_python)
 
 def result_to_string(result:CodeResult, wants:str) -> str:
     wants = wants.lower()
-    wants_options_compile = ("compile", "compiles", "compiling")
+    wants_options_compile = ("compile", "compiles", "compiling", "compile-error")
     wants_options_run = ("run", "running", "erroring", "runs")
     if wants in wants_options_compile: return "rayjs-compiling" if result.compiles else "rayjs-not-compiling"
     if wants in wants_options_run: return "rayjs-running" if result.runs else ("rayjs-erroring" if result.compiles else "rayjs-not-compiling")

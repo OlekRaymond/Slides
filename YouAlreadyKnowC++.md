@@ -435,3 +435,38 @@ int main() {
 }
 ```
 <!-- .element: class="unknown" wants="running" -->
+
+---
+
+# Forcing Correct Scope
+
+A forwarding reference can be taken, as an argument, using a const reference. This can produce a scope issue where the rvalue goes out of scope before the returned reference:
+
+```C++
+#include <vector>
+const int& first(const std::vector<int>& v) { return v.front(); }
+
+int main() {
+    {
+        std::vector<int> vec{1,2,3,4};
+        auto& first_ = first(vec); // No scope issues
+    }
+    auto& first_ = first({1,2,3,4}); // Compiles but UB
+}
+```
+<!-- .element class="unknown" wants="compiles" -->
+
+[//]: # (Vertical slide)
+
+We can force this to be a compile error by deleting the overload:
+
+```C++
+#include <vector>
+const int& first (const std::vector<int>& v) { return v.front(); }
+auto first(std::vector<int>&&) = delete;
+
+int main() {
+    auto& a = first({1,2,4}); // doesn't compile
+}
+```
+<!-- .element: class="unknown" wants="compile-error" -->
