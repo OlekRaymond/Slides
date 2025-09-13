@@ -7,6 +7,7 @@ import os
 import re
 import traceback
 import base64
+import zlib
 
 # parse slides
 # if code block:
@@ -72,7 +73,6 @@ class CodeHandlerRegistry(Protocol):
     def handle_code(self, language:RuntimeLanguage, code:str) -> CodeResult: ...
     def add_language(self, language: LiteralString, handler: Handler) -> "CodeHandlerRegistry": ...
 
-
 class DefaultHandler(CodeHandlerRegistry):
     def __init__(self):
         self.registry: dict[RuntimeLanguage, Handler] = {}
@@ -125,25 +125,28 @@ def _create_unique_file_name(code:Code) -> str:
     """
     create a unique file name based on the hash of the code
     """
-    b64_hash = base64.b64encode((code.__hash__().to_bytes(8, signed=True))).decode("utf-8")
+    # use adler for speed and determinism
+    b64_hash = base64.b64encode((zlib.adler32(code.encode("utf-8")).to_bytes(8, signed=True))).decode("utf-8")
     print(b64_hash)
     return b64_hash.replace("=", "").replace("/", "").replace("+", "")
-    
+
 def handle_cpp(code:Code) -> CodeResult:
     file_name = f"build/{_create_unique_file_name(code)}"
     source_file_name = f"{file_name}.cpp"
-    # obj_file_name = f"{file_name}.obj"
     exe_file_name = f"{file_name}"
-    source = r"int main() {" f"\n{code}\n" "}" if "main" not in code else code
-    with open(source_file_name, "w") as output:
-        output.write(source)
+    # obj_file_name = f"{file_name}.obj"
+    if not os.path.exists(source_file_name):
+        source = r"int main() {" f"\n{code}\n" "}" if "main" not in code else code
+        with open(source_file_name, "w") as output:
+            output.write(source)
     # if compile only use "-c" in the following command, we test compiling and linking for now 
-    res = subprocess.run((_CPP_COMPILER, "-o" f"{exe_file_name}" , source_file_name), stderr=subprocess.PIPE)
-    compile_result = CompileResult(str(res.stderr), res.returncode )
-    if res.returncode != 0: return CodeResult(compile_result=compile_result, run_result=None)
+    if not os.path.exists(exe_file_name):
+        res = subprocess.run((_CPP_COMPILER, "-o" f"{exe_file_name}" , source_file_name), stderr=subprocess.PIPE)
+        compile_result = CompileResult(str(res.stderr), res.returncode )
+        if res.returncode != 0: return CodeResult(compile_result=compile_result, run_result=None)
     res = subprocess.run((f"./{exe_file_name}"), stderr=subprocess.PIPE)
     run_result = RunResult(str(res.stderr), res.returncode)
-    return CodeResult(run_result=run_result, compile_result=compile_result)
+    return CodeResult(run_result=run_result, compile_result=CompileResult("Cached", 0))
 
 def handle_python(code:str) -> CodeResult:
     print_result:str = ""
