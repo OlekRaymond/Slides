@@ -440,6 +440,8 @@ int main() {
 
 # Forcing Correct Scope
 
+[//]: # (Vertical slide)
+
 A forwarding reference can be taken, as an argument, using a const reference. This can produce a scope issue where the rvalue goes out of scope before the returned reference:
 
 ```C++
@@ -454,7 +456,7 @@ int main() {
     auto& first_ = first({1,2,3,4}); // Compiles but UB
 }
 ```
-<!-- .element class="unknown" wants="compiles" -->
+<!-- .element: class="unknown" wants="compiles" -->
 
 [//]: # (Vertical slide)
 
@@ -470,3 +472,26 @@ int main() {
 }
 ```
 <!-- .element: class="unknown" wants="compile-error" -->
+
+[//]: # (Vertical slide)
+
+Similarly we can do this for classes.
+```C++
+struct S {
+    int& GetA() & { return A; } // Caller can edit A
+    int& GetA() && = delete;    // Caller shouldn't edit A, bug?
+
+    const int& GetA() & const { return A; } // Caller can't edit A
+    const int& GetA() && const = delete;    // bug?
+    int A;
+};
+
+int main() {
+    // S{}.GetA(); // Errors
+    { S s{};        s.GetA() = 1; } // Compiles
+    { const S s{};  s.GetA();     } // Compiles
+}
+```
+<!-- .element: class="compiling" wants="compiling" -->
+
+<sub><sup>most useful if doing something on a getter</sub></sup>
