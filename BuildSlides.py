@@ -254,13 +254,7 @@ def create_markdown_file(input_file_name:str, *,
     template_half_filled = template_file_setup(template_file_name, reveal_js_path)
     fill_output_template(new_markdown_data, template_half_filled, output_file_name, title=input_file_name.rsplit(".", 1)[0])
 
-def create_contents_index(to_link_to:Iterable[str]) -> None:
-    links = [f'<li><a href="{link}.html">{link}</a></li>' for link in to_link_to]
-    links_str = "\n".join(links)
-    with open("index.html", "w") as index_file:
-        index_file.write(
-f"""
-<html>
+_HTML ="""<html>
     <body>
         <h1>Contents Of Slides</h1>
         <ul>
@@ -269,7 +263,14 @@ f"""
     </body>
 </html>
 """
-        )
+def clean_link(link:str) -> str:
+    return link.rsplit(".", 1)[0].replace(" ", "_") + ".html"
+
+def create_contents_index(to_link_to:Iterable[str]) -> None:
+    links = ['<li><a href="{link}">{link}</a></li>'.format(link=clean_link(link)) for link in to_link_to]
+    links_str = "\n".join(links)
+    with open("index.html", "w") as index_file:
+        index_file.write(_HTML.format(links_str=links_str))
 
 
 def main() -> None:
@@ -290,7 +291,7 @@ def main() -> None:
         create_contents_index(input_files)
 
     for input_file in input_files:
-        output_file = args.output_prefix + input_file.rsplit(".", 1)[0] + ".html"
+        output_file = args.output_prefix + clean_link(input_file)
         print(f"Processing {input_file} to {output_file} using template {args.template}")
         create_markdown_file(input_file, template_file_name=args.template, output_file_name=output_file, reveal_js_path=args.reveal_js_path)
 
