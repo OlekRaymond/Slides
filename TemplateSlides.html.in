@@ -13,10 +13,10 @@
 		<!-- Theme used for syntax highlighted code -->
 		<link rel="stylesheet" href="@__REVEAL_JS_PATH__@plugin/highlight/monokai.css">
 		<style>
-		.rayjs-compiling { border-style: solid; border-color: green;      border-width: .1em;}
-		.rayjs-not-compiling { border-style: solid; border-color: red;    border-width: .1em;}
-		.rayjs-running { border-style: solid; border-color: green green;  border-width: .1em;}
-		.rayjs-erroring { border-style: solid; border-color: green red;   border-width: .1em;}
+		pre[does="rayjs-compiling"]     { border-style: solid; border-color: green;       border-width: .1em;}
+		pre[does="rayjs-not-compiling"] { border-style: solid; border-color: red;         border-width: .1em;}
+		pre[does="rayjs-running"]       { border-style: solid; border-color: green green; border-width: .1em;}
+		pre[does="rayjs-erroring"]      { border-style: solid; border-color: green red;   border-width: .1em;}
 		</style>
 	</head>
 	<body>

@@ -184,7 +184,9 @@ def result_to_string(result:CodeResult, wants:str) -> str:
     if wants in wants_options_run: return "rayjs-running" if result.runs else ("rayjs-erroring" if result.compiles else "rayjs-not-compiling")
     raise Exception(f"wants was ignored: {wants} was not one of {', '.join(wants_options_compile + wants_options_run)}")
 
-_FIND_CODE_PATTERN = r"(?:^```)(?P<lang>[A-Za-z+]{2,10})(?:.{0,20})$(?:\r?\n)(?P<code>(?:[^\`]){3,}?)(?:```$\n)(?:\<\!\-\- \.element: class=\")(?P<outclass>[A-Za-z0-9\-_]*?)(?:\")(?:\s?wants=\")(?P<outwants>[A-Za-z0-9\-_]*?)(?:\" \-\-\>)"
+_FIND_CODE_PATTERN = (
+    r"(?:^```)(?P<lang>[A-Za-z+]{2,10})(?:.{0,20})$(?:\r?\n)(?P<code>(?:[^\`]){3,}?)(?:```$\n)(?:\<\!\-\- \.element: class=\")(?P<outclass>[ A-Za-z0-9\-_]*?)(?:\"\s?)(?P<wantstag>wants)(?:=\")(?P<outwants>[A-Za-z0-9\-_]*?)(?:\" \-\-\>)"
+)
 _COMPILED_REGEX = re.compile(_FIND_CODE_PATTERN, re.MULTILINE)
 
 def for_each_code_block(input:Markdown, code_handler:Callable[[RuntimeLanguage, Code], CodeResult]):
@@ -198,7 +200,8 @@ def for_each_code_block(input:Markdown, code_handler:Callable[[RuntimeLanguage, 
         language = RuntimeLanguage(language)
         code :Code = groups["code"]
         code_result = code_handler(language, code)
-        reconstructed = reconstructed.replace(groups["outclass"], result_to_string(code_result, groups["outwants"]))
+        reconstructed = reconstructed.replace(groups["outwants"], result_to_string(code_result, groups["outwants"]))
+        reconstructed = reconstructed.replace(groups["wantstag"], "does")
         return reconstructed
     return _COMPILED_REGEX.sub(on_match, input)
 
@@ -274,21 +277,20 @@ def main() -> None:
     arg_parser = argparse.ArgumentParser(description="Create slides from markdown file with code blocks that can be compiled and executed.", add_help=True)
     arg_parser.add_argument("input_files", metavar="input_markdown_files", type=str, nargs="+", help="markdown files to process, wildcards are allowed")
     arg_parser.add_argument("-t", "--template", type=str, default="TemplateSlides.html.in", help="Specify the template file to use. Default is TemplateSlides.html.in")
-    arg_parser.add_argument("-o", "--output", type=str, default="index.html", help="Specify the output file name if only one filename is given.\n Default is index.html")
+    arg_parser.add_argument("-o", "--output-prefix", type=str, default="", help="Specify the output folder name.\n Default is this folder")
     arg_parser.add_argument("-r", "--reveal-js-path", type=str, default=_REVEAL_JS_PATH, help="Path to reveal.js folder.\n Defaults to cloning the reveal.js repo in build/reveal_js.")
     arg_parser.add_argument("-i", "--ignore", type=str, default="", help="glob pattern of files to ignore, useful for READMEs, defaults to nothing")
+    arg_parser.add_argument("-n", "--no-index", type=bool, default=False, help="If a contents index should be (re/)created, defaults to creating one")
+    
     args = arg_parser.parse_args()
 
     input_files:set[str] = {f for f in args.input_files if os.path.isfile(f) and (f not in args.ignore)}
-    single_file = True
-    if len(input_files) != 1:
-        single_file = False
-        # Create an index.html file if one would otherwise not be created
-        if not os.path.exists("index.html"):
-            create_contents_index(input_files)
+    # If we have an index we might have to write it again (more files) or not (rebuilding some files but not all)
+    if not args.no_index:
+        create_contents_index(input_files)
 
     for input_file in input_files:
-        output_file = args.output if single_file else input_file.rsplit(".", 1)[0] + ".html"
+        output_file = args.output_prefix + input_file.rsplit(".", 1)[0] + ".html"
         print(f"Processing {input_file} to {output_file} using template {args.template}")
         create_markdown_file(input_file, template_file_name=args.template, output_file_name=output_file, reveal_js_path=args.reveal_js_path)
 
