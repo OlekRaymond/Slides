@@ -18,7 +18,7 @@ app_code()
 # do assertions on the mock object
 app_code.assert_called_once()
 ```
-<!-- element: class="unknown" wants="runs" -->
+<!-- .element: class="unknown" wants="runs" -->
 
 [//]: # (Vertical slide)
 
@@ -47,7 +47,7 @@ You can also mock out modules by using `sys.modules`, even if we do not have the
 
 ```py
 import sys
-
+from unittest.mock import Mock
 # Acts as an import of `os`, but os is a mock object not a real one
 sys.modules["os"] = Mock() 
 
@@ -62,6 +62,7 @@ print(f"{sep.__doc__=}")
 
 ```py
 import sys
+from unittest.mock import Mock
 # Import something third party
 sys.modules["something"] = Mock()
 # import is cached, making it available (everywhere)
@@ -94,7 +95,6 @@ sys.path.append("/home/foo")
 # Now import redirects to /home/foo folder
 import foo
 ```
-<!-- .element: class="unknown" wants="runs" -->
 
 ---
 
@@ -115,9 +115,10 @@ SIMDJson does this in [simdjson.cpp](https://github.com/simdjson/simdjson/blob/m
 ```C++
 struct CallableHolder {
 	using func_t = void(*)(int);
-	func_t func = nullptr;
-	func_t& get_func() { return func; }
-	const func_t get_func() const { return func; }
+	func_t&       get_func()       { return func; }
+	const func_t& get_func() const { return func; }
+	
+	func_t m_func = nullptr;
 };
 
 CallableHolder& get_callable_holder() {
@@ -130,8 +131,8 @@ int main() {
 	get_callable_holder().get_func()(5);
 }
 ```
-<!-- .element: class="unknown" wants="compiles" -->
-<!-- .element: class="r-stretch" -->
+<!-- .element: class="r-stretch" wants="compiles" -->
+
 [//]: # (Vertical slide)
 
 This strategy/registry pattern hybrid allows for changing the app code function at runtime, and can therefore be mocked easily.
@@ -160,9 +161,7 @@ int use_Impl(Interface& interface) {
 }
 int main() { return Impl{}.foo(); }
 ```
-<!-- .element: class="unknown" wants="compiles" -->
-
-<!-- .element: class="r-stretch" -->
+<!-- .element: class="r-stretch" wants="compiles" -->
 
 <sub><sup>Can be mocked && tested with:</sup></sup>
 
@@ -238,12 +237,12 @@ or
 | - | ---- | ---- |
 | Bridge | OOP | OOP, overhead, some code changes |
 | Templates | No overhead | Less compile time checks (pre concepts), post concepts: higher build times, some code changes |
-| Headers | No overhead, No code changes, shorter build times, smaller test exes | A bit of a faff, Requires a fair amount of language knowledge |
+| Headers | No overhead, No code changes, shorter build times, smaller test exes | A bit of a faff, Requires a fair amount of language knowledge, Changes in build system |
 <!-- .element: class="r-fit-text r-frame" -->
-[//]: # (adding fragment here causes the whole table to pop in, sad)
+[//]: # (adding fragment here causes the whole table to pop in rather than one column per)
+[//]: # (A pr exists added but didn't do markdown so looks unlikely)
 
-
-[//]: # (Vertical slide)
+---
 
 I have rewritten the headers for CppUnit for the tests to execute using the GTest runtime: [CppUnit2Gtest](https://github.com/OlekRaymond/CppUnit2Gtest).
 
