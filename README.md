@@ -1,3 +1,4 @@
+<!-- .ignore -->
 
 # Rayveal.js
 
@@ -34,4 +35,10 @@ outputs index.html and no other html files
 `python3 BuildSlides.py *.md` has the exact same behaviour as if the user had typed out all the markdown files in the current directory
 
 ### Example 4:
-For use without the python file on your hard drive use: `curl -L https://raw.githubusercontent.com/OlekRaymond/Slides/refs/heads/main/BuildSlides.py > BuildSlides.py` then run with the commands above.
+For use without the python file on your hard drive use: `curl -L https://raw.githubusercontent.com/OlekRaymond/Slides/refs/heads/main/BuildSlides.py > BuildSlides.py` and also clone the template if not using a custom one with `curl -L https://raw.githubusercontent.com/OlekRaymond/Slides/refs/heads/main/TemplateSlides.html.in > TemplateSlides.html.in` then run as usual with the commands above.
+
+## Advanced usage:
+
+- Files can be ignored with the flag `--ignore <glob>` or by having `<!-- .ignore -->` as the first thing in the file
+- If working on only one file, you may not want to overwrite `index.html` or build other files, for this you can use `--no-index`
+

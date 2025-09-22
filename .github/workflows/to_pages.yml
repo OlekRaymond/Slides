@@ -26,7 +26,7 @@ jobs:
 
             - name: Build slides
               run: |
-                python3 BuildSlides.py --ignore README.* *.md
+                python3 BuildSlides.py *.md
 
             - name: Prepare deployment folder
               run: |

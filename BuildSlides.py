@@ -242,6 +242,7 @@ def _clone_reveal_js(*,
     return f"https://cdnjs.cloudflare.com/ajax/libs/reveal.js/{version_tag}/"
 
 _REVEAL_JS_PATH:Final = _clone_reveal_js()
+_IGNORE_FILE_STRING = "<!-- .ignore -->"
 
 def create_markdown_file(input_file_name:str, *,
         template_file_name:str = "TemplateSlides.html.in",
@@ -250,7 +251,14 @@ def create_markdown_file(input_file_name:str, *,
     ) -> None:
     with open(input_file_name, "r") as in_file:
         markdown_file_data = in_file.read()
+        if (markdown_file_data[0:len(_IGNORE_FILE_STRING)] == _IGNORE_FILE_STRING):
+            print(f"Ignoring file {input_file_name}")
+            return
+        print(f"Processing {input_file_name}"
+              f" to {output_file_name} using template {template_file_name}"
+            )
         new_markdown_data = for_each_code_block(markdown_file_data, handle_code)
+    
     template_half_filled = template_file_setup(template_file_name, reveal_js_path)
     fill_output_template(new_markdown_data, template_half_filled, output_file_name, title=input_file_name.rsplit(".", 1)[0])
 
@@ -292,7 +300,6 @@ def main() -> None:
 
     for input_file in input_files:
         output_file = args.output_prefix + clean_link(input_file)
-        print(f"Processing {input_file} to {output_file} using template {args.template}")
         create_markdown_file(input_file, template_file_name=args.template, output_file_name=output_file, reveal_js_path=args.reveal_js_path)
 
 if __name__ == "__main__":
