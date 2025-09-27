@@ -286,14 +286,25 @@ _HTML ="""<html>
 </html>
 """
 def clean_link(link:str) -> str:
-    return link.rsplit(".", 1)[0].replace(" ", "_") + ".html"
+    import random
+    link = link.replace(".no-index.", ".").replace("no-index", "")
+    link = link.rsplit(".", 1)[0].replace(" ", "_")
+    if len(link) <= 2:
+        return (
+            "unknown"
+            + str(base64.b64encode(random.randbytes(3)), encoding="ascii")
+            .replace("=", "")
+            .replace("/", "")
+            .replace("+", "")
+        )
+    return link + ".html"
+
 
 def create_contents_index(to_link_to:Iterable[str]) -> None:
-    links = ['<li><a href="{link}">{link}</a></li>'.format(link=clean_link(link)) for link in to_link_to]
+    links = ['<li><a href="{link}">{link}</a></li>'.format(link=clean_link(link)) for link in to_link_to if not ("no-index" in link) ]
     links_str = "\n".join(links)
     with open("index.html", "w") as index_file:
         index_file.write(_HTML.format(links_str=links_str))
-
 
 def main() -> None:
     import argparse

@@ -33,10 +33,10 @@ jobs:
                     mkdir -p deploy
                     cp -r build deploy
                     cp *.html deploy/
-                    cp *.png deploy/
-                    cp *.ico deploy/
-                    cp *.jpg deploy/
-                    cp *.svg deploy/
+                    cp *.png deploy/ || echo no png files
+                    cp *.ico deploy/ || echo no ico files
+                    cp *.jpg deploy/ || echo no jpg files
+                    cp *.svg deploy/ || echo no svg files
 
             - name: Setup Pages
               uses: actions/configure-pages@v5
