@@ -246,23 +246,35 @@ def _clone_reveal_js(*,
 _REVEAL_JS_PATH:Final = _clone_reveal_js()
 _IGNORE_FILE_STRING = "<!-- .ignore -->"
 
-def create_markdown_file(input_file_name:str, *,
-        template_file_name:str = "TemplateSlides.html.in",
-        output_file_name:str = "index.html",
-        reveal_js_path:str = _REVEAL_JS_PATH
-    ) -> None:
+def create_markdown_data(input_file_name:str) -> Markdown|None:
     with open(input_file_name, "r") as in_file:
         markdown_file_data = in_file.read()
-        if (markdown_file_data[0:len(_IGNORE_FILE_STRING)] == _IGNORE_FILE_STRING):
-            print(f"Ignoring file {input_file_name}")
-            return
-        print(f"Processing {input_file_name}"
-              f" to {output_file_name} using template {template_file_name}"
-            )
-        new_markdown_data = for_each_code_block(markdown_file_data, handle_code)
-    
+    if (markdown_file_data[0:len(_IGNORE_FILE_STRING)] == _IGNORE_FILE_STRING):
+        return None
+    return for_each_code_block(markdown_file_data, handle_code)
+
+def prepend_markdown_file(file_name_to_prepend:str|None, markdown_data:Markdown, *, new_slide:str="---") -> Markdown:
+    if file_name_to_prepend is None: return markdown_data
+    with open(file_name_to_prepend) as prepend_file:
+        prepend_data = prepend_file.read()
+    return prepend_data + "\n" + new_slide + "\n" + markdown_data
+
+def append_markdown_file(file_name_to_append:str|None, markdown_data:Markdown, *, new_slide:str="---") -> Markdown:
+    if file_name_to_append is None: return markdown_data
+    with open(file_name_to_append) as append_file:
+        append_data = append_file.read()
+    return markdown_data + "\n" + new_slide + "\n" + append_data
+
+def create_html_file(
+        markdown_data:Markdown, output_file_name:str, input_file_name:str, *, 
+        template_file_name:str = "TemplateSlides.html.in",
+        reveal_js_path:str = _REVEAL_JS_PATH
+    ) -> None:
+    print(f"Processing {input_file_name}"
+            f" to {output_file_name} using template {template_file_name}"
+        )
     template_half_filled = template_file_setup(template_file_name, reveal_js_path)
-    fill_output_template(new_markdown_data, template_half_filled, output_file_name, title=input_file_name.rsplit(".", 1)[0])
+    fill_output_template(markdown_data, template_half_filled, output_file_name, title=input_file_name.rsplit(".", 1)[0])
 
 _HTML ="""<html>
     <body>
@@ -291,8 +303,11 @@ def main() -> None:
     arg_parser.add_argument("-o", "--output-prefix", type=str, default="", help="Specify the output folder name.\n Default is this folder")
     arg_parser.add_argument("-r", "--reveal-js-path", type=str, default=_REVEAL_JS_PATH, help="Path to reveal.js folder.\n Defaults to cloning the reveal.js repo in build/reveal_js.")
     arg_parser.add_argument("-i", "--ignore", type=str, default="", help="glob pattern of files to ignore, useful for READMEs, defaults to nothing")
-    arg_parser.add_argument("-n", "--no-index", type=bool, default=False, help="If a contents index should be (re/)created, defaults to creating one")
-    
+    arg_parser.add_argument("-n", "--no-index", action="store_true", help="If a contents index should be (re/)created, defaults to creating one")
+    arg_parser.add_argument("-e", "--end-slide", type=str, default=None, help="A markdown file to append to the end of each created slide deck, useful for contact info etc.")
+    arg_parser.add_argument("-b", "--begin-slide", type=str, default=None, help="A markdown file to prepend to the start of each created slide deck")
+
+    arg_parser.add_argument("-v", "--version", action="version", version="BuildSlides 0.0.0")
     args = arg_parser.parse_args()
 
     input_files:set[str] = {f for f in args.input_files if os.path.isfile(f) and (f not in args.ignore)}
@@ -302,7 +317,13 @@ def main() -> None:
 
     for input_file in input_files:
         output_file = args.output_prefix + clean_link(input_file)
-        create_markdown_file(input_file, template_file_name=args.template, output_file_name=output_file, reveal_js_path=args.reveal_js_path)
+        markdown_data = create_markdown_data(input_file)
+        if markdown_data is None:
+            print(f"Ignoring file {input_file}")
+            continue
+        markdown_data = prepend_markdown_file(args.begin_slide, markdown_data)
+        markdown_data = append_markdown_file(args.end_slide, markdown_data)
+        create_html_file(markdown_data, output_file, input_file, template_file_name=args.template, reveal_js_path=args.reveal_js_path)
 
 if __name__ == "__main__":
     main()

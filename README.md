@@ -16,11 +16,9 @@ Rayveal.js is a simple python script that turns simple, standalone markdown into
     Slides can be released as markdown files for websites, blogs, git-books or more easily converted to slides.
 - Easy to write:
     Markdown is much easier to write than powerpoint slides, especially for developers.
-
-### TODO/Upcoming features:
 - Pre/Post slides:
     Adds a markdown file contents before and/or after each created powerpoint presentation with the given content. For example a name/intro slide can be added to the start of each slide-deck.
-- 
+
 
 ## Output
 
