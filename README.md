@@ -7,7 +7,7 @@ Rayveal.js is a simple python script that turns simple, standalone markdown into
 ## Features
 
 - Markdown:
-    Rayveal.js uses [reveal.js]() to render the markdown document.
+    Rayveal.js uses [reveal.js](https://revealjs.com/) to render the markdown document.
 - Static site:
     Despite being a markdown files, the reveal.js slide deck is a static site and thus can be served via github pages.
 - Anti Slide-ware:
@@ -17,10 +17,14 @@ Rayveal.js is a simple python script that turns simple, standalone markdown into
 - Easy to write:
     Markdown is much easier to write than powerpoint slides, especially for developers.
 
+### TODO/Upcoming features:
+- Pre/Post slides:
+    Adds a markdown file contents before and/or after each created powerpoint presentation with the given content. For example a name/intro slide can be added to the start of each slide-deck.
+- 
 
 ## Output
 
-Output comes as one or more html files, if given multiple markdown documents, we assume the user wants to create multiple slide decks so each slide deck is given it's own html file and a contents page, `index.html`, is generated.
+Output comes as two or more html files, each slide deck is given it's own html file and a contents page, `index.html`, is generated.
 
 ## Usage:
 
@@ -39,6 +43,6 @@ For use without the python file on your hard drive use: `curl -L https://raw.git
 
 ## Advanced usage:
 
-- Files can be ignored with the flag `--ignore <glob>` or by having `<!-- .ignore -->` as the first thing in the file
-- If working on only one file, you may not want to overwrite `index.html` or build other files, for this you can use `--no-index`
+- Files can be ignored with the flag `--ignore <glob>` or by having `<!-- .ignore -->` as the first line in the file.
+- If working on only one file, you may not want to overwrite `index.html` or build other files, for this you can use `--no-index`.
 

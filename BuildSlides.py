@@ -232,6 +232,8 @@ def _clone_reveal_js(*,
     dest_dir = destination_folder if destination_folder.endswith("/") else destination_folder + "/"
     if os.path.exists(destination_folder):
         return dest_dir
+    # We only need "css", "dist", "plugin" folders
+    #  TODO: Only Get required folders
     clone = subprocess.run(
         (_GIT_PATH, "clone", "-b", version_tag, "-q", "--depth", "1", "--single-branch", repo_url , destination_folder),
         stderr=subprocess.PIPE
