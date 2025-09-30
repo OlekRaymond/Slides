@@ -301,8 +301,9 @@ def clean_link(link:str) -> str:
 
 
 def create_contents_index(to_link_to:Iterable[str]) -> None:
-    links = ['<li><a href="{link}">{link}</a></li>'.format(link=clean_link(link)) for link in to_link_to if not ("no-index" in link) ]
-    links_str = "\n".join(links)
+    indexable = ['<li><a href="{link}">{link}</a></li>'.format(link=clean_link(link)) for link in to_link_to if not ("no-index" in link) ]
+    comments = ['<!-- {link} -->'.format(link=clean_link(link)) for link in to_link_to if ("no-index" in link) ]
+    links_str = "\n".join(indexable + comments)
     with open("index.html", "w") as index_file:
         index_file.write(_HTML.format(links_str=links_str))
 

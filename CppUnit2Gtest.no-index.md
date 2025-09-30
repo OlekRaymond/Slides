@@ -67,14 +67,61 @@ They since added a custom stream to maintain backwards compatibility.
 If you add neither the code fails to compile.
 <!-- .element: class="fragment" -->
 
+If add one for the tests you get a warning in release.
+<sub><sup>You have warnings as errors on right?</sup></sub>
+<!-- .element: class="fragment" -->
+
+[//]: # (Vertical slide)
+
+In Junit each test is surrounded by a try catch all. So if an exception is thrown from within a test it is caught and added to the test results.
+
+In CppUnit it is not.
+<!-- .element: class="fragment" -->
+
+Each test is surrounded by a "protector" class which the user writes and does all the catching.
+<!-- .element: class="fragment" -->
+
+If an exception is not caught no test results are given.
+<!-- .element: class="fragment" -->
+
+---
+
+## Fixes:
+
+[//]: # (Vertical slide)
+
+CppUnit allows you to fix lots of these because it's so extendable, 
+
+However:
+- Git prints in colour <!-- .element: class="fragment" -->
+- Python interpreter prints in colour <!-- .element: class="fragment" -->
+- gcc prints in colour <!-- .element: class="fragment" -->
+- Junit prints in colour <!-- .element: class="fragment" -->
+- gtest prints in colour <!-- .element: class="fragment" -->
+- doctest prints in colour <!-- .element: class="fragment" -->
+- Python's (built in) unit test print in colour <!-- .element: class="fragment" -->
+
+Why do I have to write code for CppUnit to print in colour?
+
 ---
 
 ## What is it?
 
-Converts tests written for CppUnit to be runnable with a Gtest.
+CppUnit2Gtest is a single header file that uses macro magic to register tests written for CppUnit to work with gtest.
+
+There are no requirements for CppUnit tests to be rewritten. 
+
+New tests can be written in gtest or CppUnit styles with no issues.
+
+The only code change required is in the main (because CppUnit makes you write a custom main)
 
 ---
 
 ## Why?
 
-Testing should be easy
+Testing should be easy,  <!-- .element: class="fragment" -->
+
+testing in CppUnit was hard,  <!-- .element: class="fragment" -->
+
+I made it easy  <!-- .element: class="fragment" -->
+
