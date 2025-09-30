@@ -4,6 +4,10 @@ Multiple Methods to Mock
 
 ---
 
+## What is mocking?
+
+---
+
 ### Python: Mocking Functions
 
 ```py
@@ -72,7 +76,7 @@ something.help()
 # can do assertions on the mock object
 something.help.assert_called_once()
 # To undo: pop it
-sys.modules.pop("os")
+sys.modules.pop("something")
 ```
 <!-- .element: class="runs" wants="runs" -->
 
@@ -115,8 +119,8 @@ SIMDJson does this in [simdjson.cpp](https://github.com/simdjson/simdjson/blob/m
 ```C++
 struct CallableHolder {
 	using func_t = void(*)(int);
-	func_t&       get_func()       { return func; }
-	const func_t& get_func() const { return func; }
+	func_t&       get_func()       { return m_func; }
+	const func_t& get_func() const { return m_func; }
 	
 	func_t m_func = nullptr;
 };
@@ -247,4 +251,64 @@ or
 I have rewritten the headers for CppUnit for the tests to execute using the GTest runtime: [CppUnit2Gtest](https://github.com/OlekRaymond/CppUnit2Gtest).
 
 Thus all CppUnit test code remains as is, new tests can be written in gtest style (incremental adoption) and all tests output as if they were written as gtest.
+
+[//]: # (Vertical slide)
+
+[Reasoning/Advertisement](./CppUnit2Gtest.html)
+
+[//]: # (Vertical slide)
+
+No code changes are required:
+
+[All CppUnit examples compile as expected](https://github.com/OlekRaymond/CppUnit2Gtest/tree/main/tests/examples)
+
+Proof/PR to [LibreOffice](https://www.libreoffice.org/) is WIP
+
+[//]: # (Vertical slide)
+
+CppUnit and gtest macros can be used interchangeably:
+
+[See Migration guide](https://github.com/OlekRaymond/CppUnit2Gtest/blob/main/tests/examples/Migrating.cpp)
+for more info.
+
+[//]: # (Vertical slide)
+
+Well Tested
+
+- 100% coverage
+- 100% mutation test score
+- Compiles with `Wall` and `Wextra`
+- Address and UB sanitized
+
+[//]: # (Vertical slide)
+
+Deprecated CppUnit macros are respected
+```C++
+#define CPPUNIT_TEST_SUITE_REGISTRATION(Class_name) CPPUNIT_TEST_SUITE_NAMED_REGISTRATION(Class_name, #Class_name)
+
+#define CPPUNIT_TEST_SUITE_NAMED_REGISTRATION(Class_name, suite_additional_name ) namespace{ \
+    static const size_t Cpp2Gtest_UNIQUE_NAME(unused_) = \
+    ::CppUnit::to::gtest::InternalRegisterTests<Class_name>(#Class_name, __LINE__, suite_additional_name); \
+}
+```
+[//]: # (Vertical slide)
+
+Asserts are name forwarded to gtest equivalents to give more information
+
+```C++
+#define CPPUNIT_ASSERT(condition)                                    ASSERT_TRUE(condition)
+```
+
+[//]: # (Vertical slide)
+
+Features not implemented are ignored (no code change required to compile):
+```C++
+// If we want CPPUNIT_TEST_SUITE_PROPERTY we have to call `::testing::Test::RecordProperty`
+//  but we have to do it after SetUpTestSuite and before TearDownTestSuite
+//  the macro is called between CPPUNIT_TEST_SUITE and CPPUNIT_TEST_SUITE_END (needs proof)
+//   so we'd need some state on the class and set it in the `GetAllTests_` function
+
+// Do nothing for now
+#define CPPUNIT_TEST_SUITE_PROPERTY( unused_1, unused_2 )
+```
 

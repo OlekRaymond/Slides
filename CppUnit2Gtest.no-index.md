@@ -64,16 +64,18 @@ Pre C++98 there was no standard way to print an object so CppUnit wrote a custom
 They since added a custom stream to maintain backwards compatibility.
 <!-- .element: class="fragment" -->
 
-If you add neither the code fails to compile.
+If you add neither the tests fail to compile.
 <!-- .element: class="fragment" -->
 
 If add one for the tests you get a warning in release.
-<sub><sup>You have warnings as errors on right?</sup></sub>
+<!-- .element: class="fragment" -->
+
+<sub><sup>You have warnings as errors on so it still doesn't compile</sup></sub>
 <!-- .element: class="fragment" -->
 
 [//]: # (Vertical slide)
 
-In Junit each test is surrounded by a try catch all. So if an exception is thrown from within a test it is caught and added to the test results.
+In Junit each test is surrounded by a `try`-`catch`-all. So if an exception is thrown from within a test it is caught and added to the test results.
 
 In CppUnit it is not.
 <!-- .element: class="fragment" -->
@@ -81,7 +83,7 @@ In CppUnit it is not.
 Each test is surrounded by a "protector" class which the user writes and does all the catching.
 <!-- .element: class="fragment" -->
 
-If an exception is not caught no test results are given.
+If an exception is not caught the program exits and no test results are given.
 <!-- .element: class="fragment" -->
 
 ---
@@ -101,7 +103,22 @@ However:
 - doctest prints in colour <!-- .element: class="fragment" -->
 - Python's (built in) unit test print in colour <!-- .element: class="fragment" -->
 
+[//]: # (Vertical slide)
+
 Why do I have to write code for CppUnit to print in colour?
+<!-- .element: class="fragment" -->
+
+Why do I have to write a custom outputer?
+<!-- .element: class="fragment" -->
+
+Why do I have know all possible thrown exceptions?
+<!-- .element: class="fragment" -->
+
+Why do I have to print all the data from my classes?
+<!-- .element: class="fragment" -->
+
+Why can't testing be easy?
+<!-- .element: class="fragment" -->
 
 ---
 
