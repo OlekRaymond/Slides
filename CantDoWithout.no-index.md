@@ -10,39 +10,38 @@ Getting the class name:
 #   define Ray_Demanglable
 #endif
 #include <typeinfo>
+#include <string>
 
 template<typename T>
-constexpr auto GetTypeName(const T& type = std::ignore) {
-    return
+[[nodiscard]] auto GetTypeName() {
+    
+    const auto name = typeid(T).name(); // remove const ref optional
 #if defined(Ray_Demanglable)
-        abi::__cxa_demangle
+    size_t length = 0;
+    int status = 0;
+    const auto demangled = abi::__cxa_demangle
+        (
+            name, // remove const ref optional
+            nullptr,
+            &length,
+            &status
+        );
+    if (status == 0 && length != 0 && demangled != nullptr) {
+        std::string result{demangled, length};
+        free(demangled);
+        return result;
+    }
+    else
 #endif
-    (
-        typeid(T).name() // remove const ref optional
-    );
+        return std::string{name};
 }
 ```
+<!-- .element: class="r-stretch" wants="compiles no_main" -->
 
 ---
 
 CRTP logging class:
 ```C++
-#if __has_include(<cxxabi.h>)
-#   include <cxxabi.h>
-#   define Ray_Demanglable
-#endif
-#include <typeinfo>
-
-template<typename T>
-constexpr auto GetTypeName(const T& type = std::ignore) {
-    return
-#if defined(Ray_Demanglable)
-        abi::__cxa_demangle
-#endif
-    (
-        typeid(T).name() // remove const ref optional
-    );
-}
 
 template<typename Derived>
 struct Logger : Derived {
@@ -59,7 +58,7 @@ private:
     ~Logger() { std::cout << "~" << GetDerivedName(); << "()\n"; }
 };
 ```
-<!-- .element: class="r-stretch" wants="compiles" -->
+<!-- .element: class="r-stretch" wants="compiles no-main append" -->
 
 ---
 
@@ -90,12 +89,14 @@ void HandleError() {
 }
 void Usage() {
     try {
+        const auto something_that_may_throw = [](){};
         something_that_may_throw();
     } catch(...) {
         HandleError();
     }
 }
 ```
+<!-- .element: wants="compiles no-main append" id="lip" -->
 
 ---
 
@@ -109,6 +110,8 @@ inline auto GetStackTrace() { return std::stacktrace::current(); }
 inline auto GetStackTrace() { return boost::stacktrace::stacktrace(); }
 #endif
 ```
+
+<!-- This and the following need C++23 to compile, TODO: add flags section to wants -->
 
 [//]: # (Vertical slide)
 
@@ -154,17 +157,19 @@ struct CustomException : std::logic_error {
 ```C++
 // -Werror=shadow
 //   requiring shadowing reveals a lack of imagination
-std::string foo() { std::string h{"hello"}; std::string h{"world"}; return h; }
+auto foo() { float h{1}; float h{2}; return h; }
 // -Werror=infinite-recursion
 int bar() { return bar(); } // Always a crash
 ```
+<!-- .element: wants="compiles" -->
 
 [//]: # (Vertical slide)
 
 Get feedback before ASAN runs:
 ```C++
+#include <stdlib.h>
 // -Werror=return-local-addr
-std::string& foo() { std::string h{"hello"}; return h; } // UB
+auto& foo() { float h{1.0}; return h; } // UB
 // -Werror=null-dereference
 int baz() { int* i_p = nullptr; return *i_p; } // Always a crash
 // -Werror=mismatched-dealloc
@@ -172,3 +177,5 @@ int foo() { auto p = new int[10]; free(p);     return 1; } // Triggers ASAN
 int foo2() { auto p = new int[10]; delete p;   return 1; } // Triggers ASAN
 int foo3() { auto p = new int[10]; delete[] p; return 1; } // Good
 ```
+<!-- .element: wants="compiles" -->
+

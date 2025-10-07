@@ -285,7 +285,7 @@ int main() {
     constexpr auto i = max_int + 1;
 }
 ```
-<!-- .element: class="unknown" wants="compiles" -->
+<!-- .element: class="unknown" wants="compile-error" -->
 
 Gives error:
 ```
@@ -365,7 +365,7 @@ If we do something silly to avoid this, like:
 ```C++
 int& foo() { return 1; }
 ```
-<!-- .element: class="not-compiling" wants="compile" -->
+<!-- .element: class="not-compiling" wants="compile-error" -->
 the compiler errors. 
 
 [//]: # (Vertical slide)
@@ -481,8 +481,8 @@ struct S {
     int& GetA() & { return A; } // Caller can edit A
     int& GetA() && = delete;    // Caller shouldn't edit A, bug?
 
-    const int& GetA() & const { return A; } // Caller can't edit A
-    const int& GetA() && const = delete;    // bug?
+    const int& GetA() const & { return A; } // Caller can't edit A
+    const int& GetA() const && = delete;    // bug?
     int A;
 };
 
