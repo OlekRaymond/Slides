@@ -26,7 +26,7 @@ jobs:
 
             - name: Build slides
               run: |
-                python3 BuildSlides.py -e *.post *.md
+                python3 rayveal.py -e *.post *.md
 
             - name: Prepare deployment folder
               run: |
