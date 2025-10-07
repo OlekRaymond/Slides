@@ -1,5 +1,5 @@
 
-from typing import Protocol, Callable, LiteralString, override, Final, Iterable
+from typing import Protocol, Callable, LiteralString, override, Final, Iterable, Any
 from dataclasses import dataclass
 import subprocess
 from os import getenv as get_env
@@ -65,12 +65,27 @@ class RuntimeLanguage:
     
     def __hash__(self) -> int:
         return self._value.__hash__()
+    def __repr__(self) -> str:
+        return f"RuntimeLanguage({self._value})"
 
-type Handler  = Callable[[str], CodeResult]
+class CompileExecFlags: 
+    """
+    Flags to pass to the compiler or interpreter
+    """
+    flags: set[str] | dict[str,Any] = {}
+
+class MetaData:
+    data: dict[str, str] = {}
+    def __repr__(self) -> str:
+        return self.data.__repr__()
+
+type Handler  = Callable[[str, CompileExecFlags|None, MetaData|None], CodeResult]
 type Language = LiteralString | RuntimeLanguage
 
 class CodeHandlerRegistry(Protocol):
-    def handle_code(self, language:RuntimeLanguage, code:str) -> CodeResult: ...
+    def handle_code(self, language:RuntimeLanguage, code:str,
+                    flags: CompileExecFlags|None = None,
+                    meta:MetaData| None = None) -> CodeResult: ...
     def add_language(self, language: LiteralString, handler: Handler) -> "CodeHandlerRegistry": ...
 
 class DefaultHandler(CodeHandlerRegistry):
@@ -83,7 +98,12 @@ class DefaultHandler(CodeHandlerRegistry):
         return self
 
     @override
-    def handle_code(self, language:RuntimeLanguage, code:str) -> CodeResult:
+    def handle_code(self,
+                    language: RuntimeLanguage,
+                    code:str,
+                    flags: CompileExecFlags|None = None,
+                    meta:MetaData| None = None
+                ) -> CodeResult:
         assert isinstance(language, RuntimeLanguage)
         handler = self.registry.get(language)
         if not handler:
@@ -91,20 +111,30 @@ class DefaultHandler(CodeHandlerRegistry):
                 f"Cannot handle code for this language: {language}\n"
                 f"Available languages are: {', '.join((str(k) for k in self.registry.keys()))}"
                 )
-        return handler(code)
+        return handler(code, flags, meta)
 
 _DEFAULT_HANDLER:Final = DefaultHandler()
 
-def handle_code(language: RuntimeLanguage, code:str, handler_registry: CodeHandlerRegistry | None = None):
+def handle_code(
+        language: RuntimeLanguage,
+        code:str,
+        handler_registry: CodeHandlerRegistry | None = None,
+        flags:CompileExecFlags|None = None,
+        meta: MetaData|None = None
+    ) -> CodeResult:
     handler: CodeHandlerRegistry = _DEFAULT_HANDLER if handler_registry is None else handler_registry
-    return handler.handle_code(language, code)
+    return handler.handle_code(language, code, flags=flags, meta=meta)
 
 def try_executable(exe_path:str) -> bool:
-    res = subprocess.run((exe_path, "--version"), stdout=subprocess.DEVNULL)
-    return res.returncode == 0
+    try:
+        res = subprocess.run((exe_path, "--version"), stdout=subprocess.DEVNULL)
+        return res.returncode == 0
+    except:
+        return False # windows raises for some reason
 
 def find_executable(exe_name:str) -> str | None:
-    res = subprocess.run(("whereis", exe_name), stdout=subprocess.PIPE, check=True)
+    where = "whereis" if os.name != "nt" else "where"
+    res = subprocess.run((where, exe_name), stdout=subprocess.PIPE, check=True)
     if len(res.stdout) > len(exe_name) + 3:
         return str(res.stdout).replace(exe_name, "").replace(":", "").split()[0]
 
@@ -121,34 +151,71 @@ def _get_cpp_compiler() -> str:
 
 _CPP_COMPILER:str = _get_cpp_compiler()
 
-def _create_unique_file_name(code:Code) -> str:
-    """
-    create a unique file name based on the hash of the code
-    """
-    # use adler for speed and determinism
-    b64_hash = base64.b64encode((zlib.adler32(code.encode("utf-8")).to_bytes(8, signed=True))).decode("utf-8")
-    print(b64_hash)
-    return b64_hash.replace("=", "").replace("/", "").replace("+", "")
+def clean_link(link:str) -> str:
+    import random
+    link = link.replace(".no-index.", ".").replace("no-index", "")
+    link = link.rsplit(".", 1)[0].replace(" ", "_")
+    if len(link) <= 2:
+        return (
+            "unknown"
+            + str(base64.b64encode(random.randbytes(3)), encoding="ascii")
+            .replace("=", "")
+            .replace("/", "")
+            .replace("+", "")
+        )
+    return link
 
-def handle_cpp(code:Code) -> CodeResult:
-    file_name = f"build/{_create_unique_file_name(code)}"
+def _create_unique_file_name(code:Code, meta:MetaData|None) -> str:
+    """
+    create a unique file name
+    """
+    
+    meta_data = "".join({a+b for a,b in meta.data.items()}) if meta is not None else ""
+    checksum = zlib.adler32((code+meta_data).encode("utf-8"))
+    b64_hash = base64.b64encode(checksum.to_bytes(4, signed=False)).decode("utf-8")
+    b64_hash = b64_hash.replace("=", "").replace("/", "").replace("+", "")
+    if meta is not None and "filename" in meta.data.keys(): return meta.data["filename"] + b64_hash
+    # use adler for speed and determinism
+    return b64_hash
+
+def make_source_code(code:Code, meta:MetaData|None) -> tuple[Code, bool]:
+    if "main" in code: return (code, True)
+    if meta is not None and bool(meta.data.get("no-main", False)): return (code, False)
+    else: return (r"int main() {" f"\n{code}\n" "}", True)
+
+
+def handle_cpp(code:Code,
+                flags:CompileExecFlags|None = None,
+                meta: MetaData|None = None
+            ) -> CodeResult:
+    file_name = f"build/{_create_unique_file_name(code, meta)}"
     source_file_name = f"{file_name}.cpp"
     exe_file_name = f"{file_name}"
-    # obj_file_name = f"{file_name}.obj"
+    source, has_main = make_source_code(code, meta)
+    # assumes no overlap with checksums
     if not os.path.exists(source_file_name):
-        source = r"int main() {" f"\n{code}\n" "}" if "main" not in code else code
         with open(source_file_name, "w") as output:
             output.write(source)
-    # if compile only use "-c" in the following command, we test compiling and linking for now 
     if not os.path.exists(exe_file_name):
-        res = subprocess.run((_CPP_COMPILER, "-o" f"{exe_file_name}" , source_file_name), stderr=subprocess.PIPE)
-        compile_result = CompileResult(str(res.stderr), res.returncode )
+        exe_file_name += ".o" if not has_main else ""
+        compile_args = (_CPP_COMPILER, f"-o{exe_file_name}", source_file_name)
+        if not has_main:
+            compile_args:tuple[str, ...] = compile_args + ("-c",)
+        res = subprocess.run(compile_args, stderr=subprocess.PIPE)
+        compile_result = CompileResult(res.stderr.decode(), res.returncode )
         if res.returncode != 0: return CodeResult(compile_result=compile_result, run_result=None)
-    res = subprocess.run((f"./{exe_file_name}"), stderr=subprocess.PIPE)
-    run_result = RunResult(str(res.stderr), res.returncode)
-    return CodeResult(run_result=run_result, compile_result=CompileResult("Cached", 0))
+    else:
+        compile_result = CompileResult("Cached", 0)
+    run_result = None
+    if has_main:
+        res = subprocess.run((f"./{exe_file_name}"), stderr=subprocess.PIPE)
+        run_result = RunResult(res.stderr.decode(), res.returncode)
+    return CodeResult(run_result=run_result, compile_result=compile_result)
 
-def handle_python(code:str) -> CodeResult:
+def handle_python(code:str,
+                  flags:CompileExecFlags|None = None,
+                  meta: MetaData|None = None
+                ) -> CodeResult:
     print_result:str = ""
     exit_code:int = 0
     exit_str:str = ""
@@ -163,9 +230,12 @@ def handle_python(code:str) -> CodeResult:
             return
         exit_code = 1
         exit_str = value
-
+    _locals = flags.flags.get("locals", None) if flags and isinstance(flags.flags, dict) else None
+    _globals:dict[str,Any] = flags.flags.get("globals", {}) if flags and isinstance(flags.flags, dict) else {}
+    assert isinstance(_globals, dict)
+    _globals.update({"print": mock_print, "exit":mock_exit})
     try:
-        exec(code, {"print": mock_print, "exit":mock_exit})
+        exec(code, _globals, _locals)
         return CodeResult(None, RunResult(print_result + exit_str, exit_code))
     except Exception as e:
         unwrapped_exception:list[str] = traceback.format_exception(e)
@@ -177,29 +247,84 @@ _DEFAULT_HANDLER.add_language("Python", handle_python)
 _DEFAULT_HANDLER.add_language("py", handle_python)
 
 def result_to_string(result:CodeResult, wants:str) -> str:
-    wants = wants.lower()
-    wants_options_compile = ("compile", "compiles", "compiling", "compile-error")
-    wants_options_run = ("run", "running", "erroring", "runs")
-    if wants in wants_options_compile: return "rayjs-compiling" if result.compiles else "rayjs-not-compiling"
-    if wants in wants_options_run: return "rayjs-running" if result.runs else ("rayjs-erroring" if result.compiles else "rayjs-not-compiling")
-    raise Exception(f"wants was ignored: {wants} was not one of {', '.join(wants_options_compile + wants_options_run)}")
+    _wants = set(wants.lower().split())
+
+    assert_compile_tags = {"compiles", "compiling"}
+    assert_run_tags = {"running", "runs"}
+    assert_error_tags = {"erroring", "errors", "error"}
+    assert_fails_compile_tags = {"not-compiling", "not-compiles", "not-compile", "does-not-compile", "compile-error"}
+    run_tags = {"run",}
+    compile_tags = {"compile",}
+    all = assert_compile_tags | assert_run_tags | assert_error_tags | assert_fails_compile_tags | run_tags | compile_tags
+    _wants.intersection_update(all)
+    if len(_wants) == 0: raise Exception(f"wants was ignored: {wants} does not include one of {', '.join(all)}")
+    if len(_wants) > 1: raise Exception(f"wants was ignored: {wants} includes two (not one) of {', '.join(all)}")
+    want = next(iter(_wants))
+    def create_exception(msg:str) -> Exception:
+        compile_msg =  "" if result.compile_result is None or result.compiles else result.compile_result.compiler_output 
+        run_msg = "" if result.run_result is None or result.runs else result.run_result.run_output
+        return Exception(f'{msg} because wants="{want}"\n\nCOMPILE:\n {compile_msg}\n\nRUNNING: {run_msg}')
+
+    if want in assert_compile_tags:
+        if not result.compiles: raise create_exception(f'Code did not compile but expected to')
+        return "rayjs-compiling"
+    if want in assert_run_tags:
+        if not result.runs: raise create_exception(f'Code did not run but expected to')
+        return "rayjs-running"
+    if want in assert_error_tags:
+        if result.runs: raise create_exception(f'Code ran but expected to error')
+        return "rayjs-erroring"
+    if want in assert_fails_compile_tags:
+        if result.compiles: raise create_exception(f'Code compiled but expected to not compile')
+        return "rayjs-not-compiling"
+    if want in run_tags:
+        return "rayjs-running" if result.runs else ("rayjs-erroring" if result.compiles else "rayjs-not-compiling")
+    if want in compile_tags:
+        return "rayjs-compiling" if result.compiles else "rayjs-not-compiling"
+    
+    raise Exception(f"wants was ignored: {want} extracted from {wants} was not one of {', '.join(all)}\n This should never occur")
+
+
 
 _FIND_CODE_PATTERN = (
-    r"(?:^```)(?P<lang>[A-Za-z+]{2,10})(?:.{0,20})$(?:\r?\n)(?P<code>(?:[^\`]){3,}?)(?:```$\n)(?:\<\!\-\- \.element: class=\")(?P<outclass>[ A-Za-z0-9\-_]*?)(?:\"\s?)(?P<wantstag>wants)(?:=\")(?P<outwants>[A-Za-z0-9\-_]*?)(?:\" \-\-\>)"
+    r"(?:^```)(?P<lang>[A-Za-z+]{2,10})(?:.{0,40})$(?:\r?\n)(?P<code>(?:[^\`]){3,}?)(?:```$\n)(?:\<\!\-\- \.element: class=\")(?P<outclass>[ A-Za-z0-9\-_]*?)(?:\"\s?)(?P<wantstag>wants)(?:=\")(?P<outwants>[\s\w]*?)(?:\")(?:(?:\s+id=)(?P<id>[\"'\w]+))?(?: \-\-\>)"
 )
 _COMPILED_REGEX = re.compile(_FIND_CODE_PATTERN, re.MULTILINE)
 
-def for_each_code_block(input:Markdown, code_handler:Callable[[RuntimeLanguage, Code], CodeResult]):
+def for_each_code_block(
+            input:Markdown,
+            meta:MetaData|None=None,
+            code_handler: CodeHandlerRegistry | None = None,
+        ) -> Markdown:
+    previous_language_data: dict[Language, dict[str, Code]] = {}
+    _APPEND_REGEX = re.compile(r"append (?P<id>[\w]+)")
     def on_match(full_match:re.Match[str]) -> str:
         groups = full_match.groupdict()
         reconstructed = full_match.string[full_match.start():full_match.end()]
         language = groups["lang"]
-        if groups["outwants"].lower() == "nothing":
+        wants = groups["outwants"].lower().replace("_", "-")
+        if "nothing" in wants:
             print("Did not run code for language: ", language, " because wants was ", groups["outwants"])
             return reconstructed
         language = RuntimeLanguage(language)
         code :Code = groups["code"]
-        code_result = code_handler(language, code)
+        id:str = groups["id"] if "id" in groups.keys() else "last"
+        if "append" in wants:
+            # get the next word after append, else "last"
+            if match := re.match(_APPEND_REGEX, wants):
+                id_to_append:str = match.groupdict().get("id", "last")
+            else: id_to_append:str = "last"
+            # Add the code we want to append to this code
+            code = previous_language_data[language][id_to_append] + code
+            # it can then be stored as this code's id
+            #  so if we append again it still works
+        previous_language_data.setdefault(language, {})[id] = code
+        _meta = meta
+        if "no-main" in wants:
+            _meta = MetaData() if meta is None else meta
+            _meta.data["no-main"] = "True"
+        # flags are None for now, expected to be populated via regex
+        code_result:CodeResult = handle_code(language, code, code_handler, flags=None, meta=_meta)
         reconstructed = reconstructed.replace(groups["outwants"], result_to_string(code_result, groups["outwants"]))
         reconstructed = reconstructed.replace(groups["wantstag"], "does")
         return reconstructed
@@ -251,7 +376,9 @@ def create_markdown_data(input_file_name:str) -> Markdown|None:
         markdown_file_data = in_file.read()
     if (markdown_file_data[0:len(_IGNORE_FILE_STRING)] == _IGNORE_FILE_STRING):
         return None
-    return for_each_code_block(markdown_file_data, handle_code)
+    meta = MetaData()
+    meta.data.update({"filename": clean_link(input_file_name)})
+    return for_each_code_block(markdown_file_data, meta=meta)
 
 def prepend_markdown_file(file_name_to_prepend:str|None, markdown_data:Markdown, *, new_slide:str="---") -> Markdown:
     if file_name_to_prepend is None: return markdown_data
@@ -285,31 +412,17 @@ _HTML ="""<html>
     </body>
 </html>
 """
-def clean_link(link:str) -> str:
-    import random
-    link = link.replace(".no-index.", ".").replace("no-index", "")
-    link = link.rsplit(".", 1)[0].replace(" ", "_")
-    if len(link) <= 2:
-        return (
-            "unknown"
-            + str(base64.b64encode(random.randbytes(3)), encoding="ascii")
-            .replace("=", "")
-            .replace("/", "")
-            .replace("+", "")
-        )
-    return link + ".html"
-
 
 def create_contents_index(to_link_to:Iterable[str]) -> None:
-    indexable = ['<li><a href="{link}">{link}</a></li>'.format(link=clean_link(link)) for link in to_link_to if not ("no-index" in link) ]
-    comments = ['<!-- {link} -->'.format(link=clean_link(link)) for link in to_link_to if ("no-index" in link) ]
+    indexable = ['<li><a href="{link}">{link}</a></li>'.format(link=clean_link(link) + ".html") for link in to_link_to if not ("no-index" in link) ]
+    comments = ['<!-- {link} -->'.format(link=clean_link(link) + ".html") for link in to_link_to if ("no-index" in link) ]
     links_str = "\n".join(indexable + comments)
     with open("index.html", "w") as index_file:
         index_file.write(_HTML.format(links_str=links_str))
 
 def main() -> None:
     import argparse
-    arg_parser = argparse.ArgumentParser(description="Create slides from markdown file with code blocks that can be compiled and executed.", add_help=True)
+    arg_parser = argparse.ArgumentParser(prog="Rayveal.js.py", description="Create slides from markdown file with code blocks that can be compiled and executed.", add_help=True)
     arg_parser.add_argument("input_files", metavar="input_markdown_files", type=str, nargs="+", help="markdown files to process, wildcards are allowed")
     arg_parser.add_argument("-t", "--template", type=str, default="TemplateSlides.html.in", help="Specify the template file to use. Default is TemplateSlides.html.in")
     arg_parser.add_argument("-o", "--output-prefix", type=str, default="", help="Specify the output folder name.\n Default is this folder")
@@ -328,14 +441,18 @@ def main() -> None:
         create_contents_index(input_files)
 
     for input_file in input_files:
-        output_file = args.output_prefix + clean_link(input_file)
-        markdown_data = create_markdown_data(input_file)
-        if markdown_data is None:
-            print(f"Ignoring file {input_file}")
-            continue
-        markdown_data = prepend_markdown_file(args.begin_slide, markdown_data)
-        markdown_data = append_markdown_file(args.end_slide, markdown_data)
-        create_html_file(markdown_data, output_file, input_file, template_file_name=args.template, reveal_js_path=args.reveal_js_path)
+        try:
+            output_file = args.output_prefix + clean_link(input_file) + ".html"
+            markdown_data = create_markdown_data(input_file)
+            if markdown_data is None:
+                print(f"Ignoring file {input_file}")
+                continue
+            markdown_data = prepend_markdown_file(args.begin_slide, markdown_data)
+            markdown_data = append_markdown_file(args.end_slide, markdown_data)
+            create_html_file(markdown_data, output_file, input_file, template_file_name=args.template, reveal_js_path=args.reveal_js_path)
+        except Exception as e:
+            print(f"Could not process {input_file}")
+            raise e
 
 if __name__ == "__main__":
     main()
