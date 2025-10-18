@@ -8,6 +8,7 @@ import re
 import traceback
 import base64
 import zlib
+import io
 
 # parse slides
 # if code block:
@@ -230,10 +231,14 @@ def handle_python(code:str,
             return
         exit_code = 1
         exit_str = value
+    def mock_open(file:str, mode:str="r", *args:Any, **kwargs:Any):
+        to_return = "foo bar baz".encode()
+        return io.BufferedReader(io.BytesIO(to_return), len(to_return))
+    
     _locals = flags.flags.get("locals", None) if flags and isinstance(flags.flags, dict) else None
     _globals:dict[str,Any] = flags.flags.get("globals", {}) if flags and isinstance(flags.flags, dict) else {}
     assert isinstance(_globals, dict)
-    _globals.update({"print": mock_print, "exit":mock_exit})
+    _globals.update({"print": mock_print, "exit":mock_exit, "open": mock_open})
     try:
         exec(code, _globals, _locals)
         return CodeResult(None, RunResult(print_result + exit_str, exit_code))
@@ -397,9 +402,6 @@ def create_html_file(
         template_file_name:str = "TemplateSlides.html.in",
         reveal_js_path:str = _REVEAL_JS_PATH
     ) -> None:
-    print(f"Processing {input_file_name}"
-            f" to {output_file_name} using template {template_file_name}"
-        )
     template_half_filled = template_file_setup(template_file_name, reveal_js_path)
     fill_output_template(markdown_data, template_half_filled, output_file_name, title=input_file_name.rsplit(".", 1)[0])
 
@@ -443,9 +445,10 @@ def main() -> None:
     for input_file in input_files:
         try:
             output_file = args.output_prefix + clean_link(input_file) + ".html"
+            print(f"Processing {input_file}")
             markdown_data = create_markdown_data(input_file)
             if markdown_data is None:
-                print(f"Ignoring file {input_file}")
+                print(f"Ignored file {input_file}")
                 continue
             markdown_data = prepend_markdown_file(args.begin_slide, markdown_data)
             markdown_data = append_markdown_file(args.end_slide, markdown_data)
