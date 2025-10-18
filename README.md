@@ -1,13 +1,13 @@
 <!-- .ignore -->
 
-# Rayveal.js
+# Rayveal.py
 
-Rayveal.js is a simple python script that turns simple, standalone markdown into a slide deck.
+Rayveal.py is a simple python script that turns simple, standalone markdown into a slide deck.
 
 ## Features
 
 - Markdown:
-    Rayveal.js uses [reveal.js](https://revealjs.com/) to render the markdown document.
+    Rayveal.py uses [reveal.js](https://revealjs.com/) to render the markdown document.
 - Static site:
     Despite being a markdown files, the reveal.js slide deck is a static site and thus can be served via github pages.
 - Anti Slide-ware:
