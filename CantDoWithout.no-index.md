@@ -36,29 +36,40 @@ template<typename T>
         return std::string{name};
 }
 ```
-<!-- .element: class="r-stretch" wants="compiles no_main" -->
+<!-- .element: class="r-stretch" wants="compiles no_main" id="className" -->
 
 ---
 
 CRTP logging class:
 ```C++
-
 template<typename Derived>
-struct Logger : Derived {
+struct LifeTimeLogger : Derived {
 private:
     auto GetDerivedName() {
         return GetTypeName<Derived>();
     }
 
-    Logger() { std::cout << GetDerivedName() << "()\n"; }
-    Logger(Logger&&) { auto name = GetDerivedName(); std::cout << name << "(name&&)\n"; }
-    Logger(const Logger&) { auto name = GetDerivedName(); std::cout << name << "(const " << name << "&)\n"; }
-    Logger& operator=(Logger&&) { auto name = GetDerivedName(); std::cout << name << "=" << name "&&\n"; }
-    Logger& operator=(const Logger&) { auto name = GetDerivedName(); std::cout << name << "= const" << name "&\n"; }
-    ~Logger() { std::cout << "~" << GetDerivedName(); << "()\n"; }
+    LifeTimeLogger() { std::cout << GetDerivedName() << "()\n"; }
+    LifeTimeLogger(LifeTimeLogger&&) { auto name = GetDerivedName() std::cout << name << "(name&&)\n"; }
+    LifeTimeLogger(const LifeTimeLogger&) { auto name = GetDerivedName() std::cout << name << "(const " << name << "&)\n"; }
+    LifeTimeLogger& operator=(LifeTimeLogger&&) { auto name = GetDerivedName() std::cout << name << "=" << name "&&\n"; }
+    LifeTimeLogger& operator=(const LifeTimeLogger&) { auto name = GetDerivedName() std::cout << name << "= const" << name "&\n"; }
+    ~LifeTimeLogger() { std::cout << "~" << GetDerivedName() << "()\n"; }
 };
 ```
-<!-- .element: class="r-stretch" wants="compiles no-main append" -->
+<!-- .element: class="r-stretch" wants="compiles no-main append" id=logger" -->
+
+[//]: # (Vertical slide)
+
+```C++
+struct L : LifeTimeLogger<L> { int i; };
+int main() {
+    L l{1};
+    return l.i;
+}
+```
+<!-- .element: wants="runs append" -->
+
 
 ---
 
@@ -96,7 +107,7 @@ void Usage() {
     }
 }
 ```
-<!-- .element: wants="compiles no-main append" id="lip" -->
+<!-- .element: class="r-fit" wants="compiles no-main append className" id="lip" -->
 
 ---
 
@@ -104,10 +115,14 @@ Stack Traces:
 ```C++
 #if __cpp_lib_stacktrace >= 202011L
 #   include <stacktrace>
-inline auto GetStackTrace() { return std::stacktrace::current(); }
+    inline auto GetStackTrace() {
+        return std::stacktrace::current();
+    }
 #else
 #   include <boost/stacktrace.hpp>
-inline auto GetStackTrace() { return boost::stacktrace::stacktrace(); }
+    inline auto GetStackTrace() {
+        return boost::stacktrace::stacktrace();
+    }
 #endif
 ```
 
@@ -120,7 +135,9 @@ Stack Traces on exit:
 # include <iostream>
 
 int main() { 
-    std::set_terminate([](){ std::cout << GetStackTrace() << "\n"; });
+    std::set_terminate(
+        [](){ std::cout << GetStackTrace() << "\n"; }
+    );
 }
 ```
 
@@ -139,17 +156,18 @@ ASAN tends to give a nice stacktrace and should be on for tests anyway.
 Stack traces on exceptions:
 ```C++
 struct CustomException : std::logic_error {
-    using std::string_literals
+    using std::string_literals;
     
     CustomException(const std::string& what)
-      : std::logic_error("CustomException: "s + what + " From trace: "s + GetStackTrace())
-    { }
-    // Explicit const char* is deleted, what is not overridden
-
+      : std::logic_error(
+        "CustomException: "s + what + " From trace: "s + GetStackTrace()
+    ) { }
+    
     CustomException(const CustomException&) = default;
     CustomException& operator=(const CustomException&) = default;
 };
 ```
+
 
 ---
 
@@ -158,8 +176,9 @@ struct CustomException : std::logic_error {
 // -Werror=shadow
 //   requiring shadowing reveals a lack of imagination
 auto foo() { float h{1}; float h{2}; return h; }
+
 // -Werror=infinite-recursion
-int bar() { return bar(); } // Always a crash
+int crash() { return bar(); }
 ```
 <!-- .element: wants="compiles" -->
 
@@ -168,14 +187,102 @@ int bar() { return bar(); } // Always a crash
 Get feedback before ASAN runs:
 ```C++
 #include <stdlib.h>
+
 // -Werror=return-local-addr
-auto& foo() { float h{1.0}; return h; } // UB
+auto& UB() { float h{1.0}; return h; }
+
 // -Werror=null-dereference
-int baz() { int* i_p = nullptr; return *i_p; } // Always a crash
+int crash() { int* i_p = nullptr; return *i_p; }
+
 // -Werror=mismatched-dealloc
-int foo() { auto p = new int[10]; free(p);     return 1; } // Triggers ASAN
-int foo2() { auto p = new int[10]; delete p;   return 1; } // Triggers ASAN
-int foo3() { auto p = new int[10]; delete[] p; return 1; } // Good
+int ASAN() { int* p = new int[10]; free(p);    return 1; }
+int ASAN2() { int* p = new int[10]; delete p;  return 1; }
+int good() { int* p = new int[10]; delete[] p; return 1; }
 ```
 <!-- .element: wants="compiles" -->
+
+---
+
+# Things I like but aren't essential
+
+---
+
+Reduction of soft contracts (and documentation) through API design
+
+[//]: # (Vertical slide)
+
+```C++
+#include <optional>
+#include <cstddef>
+#include <type_traits>
+
+template<typename V>
+struct Optional {
+    constexpr Optional(V&& value) : value_(value) {}
+
+    constexpr auto isValid() const { return ValidType<true>(*this); }
+    constexpr auto isValid() { return ValidType<false>(*this); }
+
+private:
+    std::optional<V> value_;
+    template<bool is_const>
+    struct ValidType {
+        using UnderlyingType = typename std::conditional<is_const, const std::optional<V>, std::optional<V>>::type;
+        constexpr V get() {
+            return value_.get();
+        }
+        constexpr const V* operator->() const { return value_.value(); }
+        constexpr V* operator->() { return value_.value(); }
+        constexpr const V& operator*() const & { return value_.value(); }
+        constexpr V& operator*() & { return value_.value(); }
+        constexpr const V&& operator*() const && { return value_.value(); }
+        constexpr V&& operator*() && { return value_.value(); }
+        constexpr operator bool() { return value_.has_value(); }
+
+
+    private:
+        friend Optional;
+        template<typename O>
+        constexpr ValidType(O& o) : value_{o.value_} { /*static_assert(O is Optional)*/ }
+        UnderlyingType& value_;
+        ValidType() = delete;
+        ValidType(ValidType&&) = delete;
+        ValidType(const ValidType&) = delete;
+    };
+};
+```
+<!-- .element: wants="compiles no-main" class="r-fit" -->
+
+[//]: # (Vertical slide)
+
+```C++
+int main() {
+    Optional<int> optional{1};
+    // auto compiler_error = optional.get();
+
+    // Must be auto (anonymous type)
+    if (auto valid = optional.isValid(); valid) {
+        return *valid;
+    }
+}
+```
+<!-- .element: wants="runs append" -->
+
+---
+
+Soft contracts can also be reduced using `constexpr` and `static_asserts`
+```C++
+#include <string_view>
+
+constexpr bool ContainsUnderscores(const std::string_view suite_name) {
+    return suite_name.find("_") != std::string_view::npos;
+}
+
+#define SomeMacro(item)                                     \
+    static_assert(!ContainsUnderscores(#item),              \
+        "item names are not allowed to contain underscores" \
+    );                                                      \
+    NormalMacro...
+```
+
 

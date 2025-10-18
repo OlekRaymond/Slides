@@ -38,7 +38,7 @@ in the dirt. <!-- .element: class="fragment" -->
 
 Early Junit made a decision to have the message first, then the objects to assert. (i.e. optional argument first).
 
-Junit has since removed this in favour of the message being at the end.
+Junit has since removed this in favour of the message as the last parameter.
 <!-- .element: class="fragment" -->
 
 CppUnit has not made such a change.
@@ -125,12 +125,16 @@ Why can't testing be easy?
 ## What is it?
 
 CppUnit2Gtest is a single header file that uses macro magic to register tests written for CppUnit to work with gtest.
+<!-- .element: class="fragment" -->
 
 There are no requirements for CppUnit tests to be rewritten. 
+<!-- .element: class="fragment" -->
 
 New tests can be written in gtest or CppUnit styles with no issues.
+<!-- .element: class="fragment" -->
 
 The only code change required is in the main (because CppUnit makes you write a custom main)
+<!-- .element: class="fragment" -->
 
 ---
 

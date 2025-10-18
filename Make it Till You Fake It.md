@@ -248,13 +248,32 @@ or
 
 ---
 
-I have rewritten the headers for CppUnit for the tests to execute using the GTest runtime: [CppUnit2Gtest](https://github.com/OlekRaymond/CppUnit2Gtest).
+### Example:
 
-Thus all CppUnit test code remains as is, new tests can be written in gtest style (incremental adoption) and all tests output as if they were written as gtest.
+If your code is mostly macros (e.g. testing) it's fairly easy to create a new implementation.
+
+I have done this for ~~popular~~ testing framework CppUnit to use the gtest runtime.
+<!-- .element: class="fragment" -->
+
+So all CppUnit test code remains as is, new tests can be written in gtest style (incremental adoption) and all tests output as if they were written as gtest.
+<!-- .element: class="fragment" -->
+
+[Check it out](https://github.com/OlekRaymond/CppUnit2Gtest)
+<!-- .element: class="fragment" -->
+
+[//]: # (Vertical slide)
+
+All implementation is in one file.
+
+CMake creates symlinks* to the CppUnit header file names and installs them.
+
+The user includes these symlink* headers instead of CppUnit ones.
 
 [//]: # (Vertical slide)
 
 [Reasoning/Advertisement](./CppUnit2Gtest.html)
+
+[LinkedIn blog post](https://www.linkedin.com/feed/update/urn:li:activity:7361057939610034176/)
 
 [//]: # (Vertical slide)
 
@@ -263,6 +282,7 @@ No code changes are required:
 [All CppUnit examples compile as expected](https://github.com/OlekRaymond/CppUnit2Gtest/tree/main/tests/examples)
 
 Proof/PR to [LibreOffice](https://www.libreoffice.org/) is WIP
+<!-- .element: class="fragment" -->
 
 [//]: # (Vertical slide)
 
@@ -296,19 +316,125 @@ Deprecated CppUnit macros are respected
 Asserts are name forwarded to gtest equivalents to give more information
 
 ```C++
-#define CPPUNIT_ASSERT(condition)                                    ASSERT_TRUE(condition)
+#define CPPUNIT_ASSERT(condition) \ ASSERT_TRUE(condition)
 ```
 
 [//]: # (Vertical slide)
 
-Features not implemented are ignored (no code change required to compile):
+Features not yet implemented are ignored (no code change required to compile) with explanation:
 ```C++
-// If we want CPPUNIT_TEST_SUITE_PROPERTY we have to call `::testing::Test::RecordProperty`
-//  but we have to do it after SetUpTestSuite and before TearDownTestSuite
-//  the macro is called between CPPUNIT_TEST_SUITE and CPPUNIT_TEST_SUITE_END (needs proof)
-//   so we'd need some state on the class and set it in the `GetAllTests_` function
+// If we want CPPUNIT_TEST_SUITE_PROPERTY we ...
 
 // Do nothing for now
 #define CPPUNIT_TEST_SUITE_PROPERTY( unused_1, unused_2 )
 ```
+
+---
+
+More explanation
+
+[//]: # (Vertical slide)
+<!-- .element: class="multiCol r-fit small" style="width:1200px; height:1200px; inset: 0% auto auto -12%;" -->
+
+```
+installed
+├── include
+│   ├── CppUnit2Gtest.hpp
+│   └── cppunit
+│       ├── config
+│       │   └── SourcePrefix.h
+│       ├── extensions
+│       │   └── HelperMacros.h
+│       └── portability
+│           └── Stream.h
+└── share
+    └── cmake
+        └── CppUnit2Gtest
+            ├── CppUnit2GtestConfig.cmake
+            ├── CppUnit2GtestConfigVersion.cmake
+            └── CppUnit2GtestTargets.cmake
+```
+<!-- .element: class="col r-fit" -->
+
+```
+/usr/include/cppunit
+├── AdditionalMessage.h
+├── Asserter.h
+├── BriefTestProgressListener.h
+├── CompilerOutputter.h
+├── Exception.h
+├── Message.h
+├── Outputter.h
+├── Portability.h
+├── Protector.h
+├── SourceLine.h
+├── SynchronizedObject.h
+├── Test.h
+├── TestAssert.h
+├── TestCaller.h
+├── TestCase.h
+├── TestComposite.h
+├── TestFailure.h
+├── TestFixture.h
+├── TestLeaf.h
+├── TestListener.h
+├── TestPath.h
+├── TestResult.h
+├── TestResultCollector.h
+├── TestRunner.h
+├── TestSuccessListener.h
+├── TestSuite.h
+├── TextOutputter.h
+├── TextTestProgressListener.h
+├── TextTestResult.h
+├── TextTestRunner.h
+├── XmlOutputter.h
+├── XmlOutputterHook.h
+├── config
+│   ├── CppUnitApi.h
+│   ├── SelectDllLoader.h
+│   ├── SourcePrefix.h
+│   ├── config-bcb5.h
+│   ├── config-evc4.h
+│   ├── config-mac.h
+│   └── config-msvc6.h
+├── config-auto.h
+├── extensions
+│   ├── AutoRegisterSuite.h
+│   ├── ExceptionTestCaseDecorator.h
+│   ├── HelperMacros.h
+│   ├── Orthodox.h
+│   ├── RepeatedTest.h
+│   ├── TestCaseDecorator.h
+│   ├── TestDecorator.h
+│   ├── TestFactory.h
+│   ├── TestFactoryRegistry.h
+│   ├── TestFixtureFactory.h
+│   ├── TestNamer.h
+│   ├── TestSetUp.h
+│   ├── TestSuiteBuilderContext.h
+│   ├── TestSuiteFactory.h
+│   └── TypeInfoHelper.h
+├── plugin
+│   ├── DynamicLibraryManager.h
+│   ├── DynamicLibraryManagerException.h
+│   ├── PlugInManager.h
+│   ├── PlugInParameters.h
+│   ├── TestPlugIn.h
+│   └── TestPlugInDefaultImpl.h
+├── portability
+│   ├── FloatingPoint.h
+│   └── Stream.h
+├── tools
+│   ├── Algorithm.h
+│   ├── StringHelper.h
+│   ├── StringTools.h
+│   ├── XmlDocument.h
+│   └── XmlElement.h
+└── ui
+    └── text
+        ├── TestRunner.h
+        └── TextTestRunner.h
+```
+<!-- .element: class="col r-fit" -->
 

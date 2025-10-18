@@ -17,6 +17,19 @@
 		pre[does="rayjs-not-compiling"] { border-style: solid; border-color: red;         border-width: .1em;}
 		pre[does="rayjs-running"]       { border-style: solid; border-color: green green; border-width: .1em;}
 		pre[does="rayjs-erroring"]      { border-style: solid; border-color: green red;   border-width: .1em;}
+		.multiCol {
+			display: table;
+			table-layout: fixed;
+			width: 100%;
+			text-align: left;
+			.col {
+				display: table-cell;
+				vertical-align: top;
+				width: 45%;
+				padding: 2% 0 2% 3%;
+				&:first-of-type { padding-left: 0; }
+			}
+		}
 		</style>
 	</head>
 	<body>
