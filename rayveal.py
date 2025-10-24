@@ -55,7 +55,10 @@ class RuntimeLanguage:
     def __init__(self, string:str) -> None:
         if len(string) > 10 or ' ' in string:
             raise RuntimeError("Language did not fill appropriate requirements")
-        self._value:str = string.lower()
+        match string.lower():
+            case "cpp" | "c++" | "cxx": self._value = "cpp"
+            case "python" | "py": self._value = "python"
+            case _: self._value = string.lower()
 
     def __str__(self) -> str:
         return self._value
@@ -292,7 +295,7 @@ def result_to_string(result:CodeResult, wants:str) -> str:
 
 
 _FIND_CODE_PATTERN = (
-    r"(?:^```)(?P<lang>[A-Za-z+]{2,10})(?:.{0,40})$(?:\r?\n)(?P<code>(?:[^\`]){3,}?)(?:```$\n)(?:\<\!\-\- \.element: class=\")(?P<outclass>[ A-Za-z0-9\-_]*?)(?:\"\s?)(?P<wantstag>wants)(?:=\")(?P<outwants>[\s\w]*?)(?:\")(?:(?:\s+id=)(?P<id>[\"'\w]+))?(?: \-\-\>)"
+    r"(?:^```)(?P<lang>[A-Za-z+]{2,10})(?:.{0,40})$(?:\r?\n)(?P<code>(?:[^\`]){3,}?)(?:```$\n)(?:\<\!\-\- \.element: class=\")(?P<outclass>[ A-Za-z0-9\-_]*?)(?:\"\s?)(?P<wantstag>wants)(?:=\")(?P<outwants>[-\s\w]*?)(?:\")(?:(?:\s+id=)(?P<id>[\"'\w]+))?(?: \-\-\>)"
 )
 _COMPILED_REGEX = re.compile(_FIND_CODE_PATTERN, re.MULTILINE)
 
@@ -317,13 +320,22 @@ def for_each_code_block(
         if "append" in wants:
             # get the next word after append, else "last"
             if match := re.match(_APPEND_REGEX, wants):
-                id_to_append:str = match.groupdict().get("id", "last")
-            else: id_to_append:str = "last"
+                raw_id = match.groupdict().get("id")
+                if raw_id is not None: id_to_append = str(raw_id)
+                else: id_to_append = "last"
+            else: id_to_append = "last"
             # Add the code we want to append to this code
-            code = previous_language_data[language][id_to_append] + code
+            try:
+                code = previous_language_data[language][id_to_append] + code
+            except KeyError as e:
+                raise KeyError(f"Lookup language={language=}      "
+                               f"Keys: {previous_language_data.keys()=}"
+                               ) from e
             # it can then be stored as this code's id
             #  so if we append again it still works
         previous_language_data.setdefault(language, {})[id] = code
+        if id != "last": previous_language_data.setdefault(language, {})["last"] = code
+        # print("Set data")
         _meta = meta
         if "no-main" in wants:
             _meta = MetaData() if meta is None else meta

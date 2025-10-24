@@ -46,6 +46,16 @@ CppUnit has not made such a change.
 
 [//]: # (Vertical slide)
 
+But it's consistent so not that big a deal.
+
+# NO
+<!-- .element: class="fragment" -->
+
+If you define a custom assertion macro with `Asserter::failIf` the condition comes first, then the message!
+<!-- .element: class="fragment" -->
+
+[//]: # (Vertical slide)
+
 Junit created a great XML format that could be parsed by other tools, allowing for easy visualisation.
 
 Many other testing frameworks saw these benefits and decided to also produce output in the same format to make use said tools. 
@@ -135,6 +145,23 @@ New tests can be written in gtest or CppUnit styles with no issues.
 
 The only code change required is in the main (because CppUnit makes you write a custom main)
 <!-- .element: class="fragment" -->
+
+---
+
+## Success stories
+
+WIP PR on [GNU Radio](https://github.com/gnuradio/gnuradio)
+
+~~WIP PR on [openLVC](https://github.com/openlvc/portico/tree/master)~~
+<sub><sup>They commit binaries so I am avoiding it for the time being</sup></sup>
+
+[//]: # (Vertical slide)
+
+And some less popular repos:
+
+**Merged** into [Martchus/cpp-utilities](https://github.com/Martchus/cpp-utilities)
+
+WIP PR on [ludwig/examples](https://github.com/ludwig/examples/tree/master/testing/cppunit)
 
 ---
 

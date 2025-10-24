@@ -281,9 +281,6 @@ No code changes are required:
 
 [All CppUnit examples compile as expected](https://github.com/OlekRaymond/CppUnit2Gtest/tree/main/tests/examples)
 
-Proof/PR to [LibreOffice](https://www.libreoffice.org/) is WIP
-<!-- .element: class="fragment" -->
-
 [//]: # (Vertical slide)
 
 CppUnit and gtest macros can be used interchangeably:

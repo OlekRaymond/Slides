@@ -11,9 +11,10 @@ Getting the class name:
 #endif
 #include <typeinfo>
 #include <string>
+#include <iostream>
 
 template<typename T>
-[[nodiscard]] auto GetTypeName() {
+[[nodiscard]] auto GetTypeName([[maybe_unused]] const T&) {
     
     const auto name = typeid(T).name(); // remove const ref optional
 #if defined(Ray_Demanglable)
@@ -50,10 +51,10 @@ private:
     }
 
     LifeTimeLogger() { std::cout << GetDerivedName() << "()\n"; }
-    LifeTimeLogger(LifeTimeLogger&&) { auto name = GetDerivedName() std::cout << name << "(name&&)\n"; }
-    LifeTimeLogger(const LifeTimeLogger&) { auto name = GetDerivedName() std::cout << name << "(const " << name << "&)\n"; }
-    LifeTimeLogger& operator=(LifeTimeLogger&&) { auto name = GetDerivedName() std::cout << name << "=" << name "&&\n"; }
-    LifeTimeLogger& operator=(const LifeTimeLogger&) { auto name = GetDerivedName() std::cout << name << "= const" << name "&\n"; }
+    LifeTimeLogger(LifeTimeLogger&&) { auto name = GetDerivedName(); std::cout << name << "(name&&)\n"; }
+    LifeTimeLogger(const LifeTimeLogger&) { auto name = GetDerivedName(); std::cout << name << "(const " << name << "&)\n"; }
+    LifeTimeLogger& operator=(LifeTimeLogger&&) { auto name = GetDerivedName();std::cout << name << "=" << name << "&&\n"; }
+    LifeTimeLogger& operator=(const LifeTimeLogger&) { auto name = GetDerivedName(); std::cout << name << "= const" << name << "&\n"; }
     ~LifeTimeLogger() { std::cout << "~" << GetDerivedName() << "()\n"; }
 };
 ```
@@ -79,15 +80,15 @@ Lippincott error handling:
 #include <exception>
 
 void HandleError() {
-    const auto print_std = {}(const auto& exception) {
-        return (std::cout << "Error: " << GetTypeName(exception) << ":" << e.what() << "\n");
+    const auto print_std = [](const auto& e) {
+        std::cout << "Error: " << GetTypeName(e) << ":" << e.what() << "\n";
     };
     try {
         throw;
     // Your custom exceptions
     } catch (const std::nested_exception& e) {
-        print_std(e);
-        try { std::rethrow_if_nested(e) } catch (...) { std::cout << "From: "; HandleError(); }
+        // print_std(e);
+        try { std::rethrow_if_nested(e); } catch (...) { std::cout << "From: "; HandleError(); }
     } catch (const std::logic_error& e) {
         print_std(e);
     } catch (const std::runtime_error& e) {
@@ -179,6 +180,10 @@ auto foo() { float h{1}; float h{2}; return h; }
 
 // -Werror=infinite-recursion
 int crash() { return bar(); }
+
+// -Werror=return-type
+//  no return statement in function returning non-void
+int return_stack() { };
 ```
 <!-- .element: wants="compiles" -->
 
@@ -200,6 +205,18 @@ int ASAN2() { int* p = new int[10]; delete p;  return 1; }
 int good() { int* p = new int[10]; delete[] p; return 1; }
 ```
 <!-- .element: wants="compiles" -->
+
+[//]: # (Vertical slide)
+
+For ease of coping:
+```
+-Werror=shadow
+-Werror=infinite-recursion
+-Werror=return-type
+-Werror=return-local-addr
+-Werror=null-dereference
+-Werror=mismatched-dealloc
+```
 
 ---
 
@@ -284,5 +301,85 @@ constexpr bool ContainsUnderscores(const std::string_view suite_name) {
     );                                                      \
     NormalMacro...
 ```
+
+---
+
+# Things I have yet to use but kinda fit
+## (Reflection adjacent)
+
+---
+
+```C++
+#include <string_view>
+
+constexpr bool is_msvc() noexcept {
+    return
+#ifdef _MSC_BUILD
+    true
+#else 
+    false
+#endif
+    ;
+}
+
+constexpr bool is_structor_impl(std::string_view name) {
+    // "A::A()" format is a constructor
+    // "A::~A()" format is a destructor
+    // "int A::b()" format is a method
+    // operator bool seems print with a return type
+    // everything else should have a space
+    using namespace std::string_view_literals;
+    constexpr auto member_call_windows = "__thiscall "sv;
+
+    if (is_msvc()) {
+        if (name.find(member_call_windows) == name.npos ){
+            return false;
+        }
+        name.remove_prefix(member_call_windows.size());
+        if (name.find("(void)") == name.npos ){
+            return false;
+        }
+    }
+
+    const auto space = name.find(' ');
+    if (space != name.npos) { return false; }
+    return true;
+}
+
+#ifndef _MSC_BUILD
+#   define is_structor() is_structor_impl(__PRETTY_FUNCTION__)
+#else 
+#   define is_structor() is_structor_impl(__FUNCSIG__)
+#endif
+```
+<!-- .element: wants="compiles no-main" class="r-fit" -->
+
+[//]: # (Vertical slide)
+
+Usage:
+
+```C++
+struct A {
+    A() {
+        static_assert(is_structor());
+    }
+    int b() {
+        static_assert(!is_structor());
+        return 1;
+    }
+    operator bool() {
+        static_assert(!is_structor());
+        return false;
+    }
+    ~A() { static_assert(is_structor()); }
+};
+
+int c = A{}.b();
+bool b = A{};
+```
+<!-- .element: wants="compiles no-main append" class="r-fit" -->
+
+---
+
 
 
