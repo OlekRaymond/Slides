@@ -3,7 +3,7 @@
 
 ---
 
-Getting the class name:
+### Getting the class name:
 ```C++
 #if __has_include(<cxxabi.h>)
 #   include <cxxabi.h>
@@ -14,7 +14,7 @@ Getting the class name:
 #include <iostream>
 
 template<typename T>
-[[nodiscard]] auto GetTypeName([[maybe_unused]] const T&) {
+[[nodiscard]] std::string GetTypeName() {
     
     const auto name = typeid(T).name(); // remove const ref optional
 #if defined(Ray_Demanglable)
@@ -41,15 +41,15 @@ template<typename T>
 
 ---
 
-CRTP logging class:
+### CRTP logging class:
 ```C++
 template<typename Derived>
-struct LifeTimeLogger : Derived {
+struct LifeTimeLogger {
 private:
     auto GetDerivedName() {
         return GetTypeName<Derived>();
     }
-
+public:
     LifeTimeLogger() { std::cout << GetDerivedName() << "()\n"; }
     LifeTimeLogger(LifeTimeLogger&&) { auto name = GetDerivedName(); std::cout << name << "(name&&)\n"; }
     LifeTimeLogger(const LifeTimeLogger&) { auto name = GetDerivedName(); std::cout << name << "(const " << name << "&)\n"; }
@@ -63,9 +63,9 @@ private:
 [//]: # (Vertical slide)
 
 ```C++
-struct L : LifeTimeLogger<L> { int i; };
+struct L : LifeTimeLogger<L> { int i = 0; };
 int main() {
-    L l{1};
+    L l{};
     return l.i;
 }
 ```
@@ -81,7 +81,7 @@ Lippincott error handling:
 
 void HandleError() {
     const auto print_std = [](const auto& e) {
-        std::cout << "Error: " << GetTypeName(e) << ":" << e.what() << "\n";
+        std::cout << "Error: " << GetTypeName<decltype(e)> () << ":" << e.what() << "\n";
     };
     try {
         throw;
@@ -176,10 +176,10 @@ struct CustomException : std::logic_error {
 ```C++
 // -Werror=shadow
 //   requiring shadowing reveals a lack of imagination
-auto foo() { float h{1}; float h{2}; return h; }
+auto foo() { float h{1}; { float h{2}; return h; } }
 
 // -Werror=infinite-recursion
-int crash() { return bar(); }
+int crash() { return crash(); }
 
 // -Werror=return-type
 //  no return statement in function returning non-void
@@ -217,6 +217,14 @@ For ease of coping:
 -Werror=null-dereference
 -Werror=mismatched-dealloc
 ```
+
+---
+
+### CRTP Name forwarding
+
+[//]: # (Vertical slide)
+
+We use CRTP all the time: [strong typing libs](github.com/rollbear/strong_type), [unit libs](), [lifetime logging code^](#crtp-logging-class), [serialisation code]()
 
 ---
 
@@ -268,13 +276,13 @@ private:
     };
 };
 ```
-<!-- .element: wants="compiles no-main" class="r-fit" -->
+<!-- .element: class="r-fit" wants="compiles no-main" -->
 
 [//]: # (Vertical slide)
 
 ```C++
 int main() {
-    Optional<int> optional{1};
+    Optional<int> optional{0};
     // auto compiler_error = optional.get();
 
     // Must be auto (anonymous type)
@@ -352,7 +360,7 @@ constexpr bool is_structor_impl(std::string_view name) {
 #   define is_structor() is_structor_impl(__FUNCSIG__)
 #endif
 ```
-<!-- .element: wants="compiles no-main" class="r-fit" -->
+<!-- .element: class="r-fit" wants="compiles no-main" -->
 
 [//]: # (Vertical slide)
 
@@ -377,7 +385,7 @@ struct A {
 int c = A{}.b();
 bool b = A{};
 ```
-<!-- .element: wants="compiles no-main append" class="r-fit" -->
+<!-- .element: class="r-fit" wants="compiles no-main append" -->
 
 ---
 
