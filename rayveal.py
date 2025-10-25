@@ -206,14 +206,14 @@ def handle_cpp(code:Code,
         if not has_main:
             compile_args:tuple[str, ...] = compile_args + ("-c",)
         res = subprocess.run(compile_args, stderr=subprocess.PIPE)
-        compile_result = CompileResult(res.stderr.decode(), res.returncode )
+        compile_result = CompileResult(f"Compiling {file_name}:\n" + res.stderr.decode(), res.returncode )
         if res.returncode != 0: return CodeResult(compile_result=compile_result, run_result=None)
     else:
         compile_result = CompileResult("Cached", 0)
     run_result = None
     if has_main:
-        res = subprocess.run((f"./{exe_file_name}"), stderr=subprocess.PIPE)
-        run_result = RunResult(res.stderr.decode(), res.returncode)
+        res = subprocess.run((f"./{exe_file_name}"), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        run_result = RunResult(f"Running {file_name}" + res.stderr.decode() + res.stdout.decode(), res.returncode)
     return CodeResult(run_result=run_result, compile_result=compile_result)
 
 def handle_python(code:str,
@@ -269,9 +269,12 @@ def result_to_string(result:CodeResult, wants:str) -> str:
     if len(_wants) > 1: raise Exception(f"wants was ignored: {wants} includes two (not one) of {', '.join(all)}")
     want = next(iter(_wants))
     def create_exception(msg:str) -> Exception:
-        compile_msg =  "" if result.compile_result is None or result.compiles else result.compile_result.compiler_output 
-        run_msg = "" if result.run_result is None or result.runs else result.run_result.run_output
-        return Exception(f'{msg} because wants="{want}"\n\nCOMPILE:\n {compile_msg}\n\nRUNNING: {run_msg}')
+        compile_msg =  "" if result.compile_result is None else result.compile_result.compiler_output 
+        run_msg = "" if result.run_result is None else result.run_result.run_output
+        run_code = "" if result.run_result is None or result.runs else result.run_result.return_code
+        return Exception(f'{msg} because wants contains "{want}" (in {wants})\n'
+                         f' \n\nCOMPILE:\n {compile_msg}\n\nRUNNING: {run_msg}\n\n'
+                         f' Code: {run_code}')
 
     if want in assert_compile_tags:
         if not result.compiles: raise create_exception(f'Code did not compile but expected to')
@@ -295,7 +298,7 @@ def result_to_string(result:CodeResult, wants:str) -> str:
 
 
 _FIND_CODE_PATTERN = (
-    r"(?:^```)(?P<lang>[A-Za-z+]{2,10})(?:.{0,40})$(?:\r?\n)(?P<code>(?:[^\`]){3,}?)(?:```$\n)(?:\<\!\-\- \.element: class=\")(?P<outclass>[ A-Za-z0-9\-_]*?)(?:\"\s?)(?P<wantstag>wants)(?:=\")(?P<outwants>[-\s\w]*?)(?:\")(?:(?:\s+id=)(?P<id>[\"'\w]+))?(?: \-\-\>)"
+    r"(?:^```)(?P<lang>[A-Za-z+]{2,10})(?:.{0,40})$(?:\r?\n)(?P<code>(?:[^\`]){3,}?)(?:```$\n)(?:\<\!\-\- \.element: )(?:(?:class=\")(?P<outclass>[ A-Za-z0-9\-_]*?)(?:\"\s?))?(?P<wantstag>wants)(?:=\")(?P<outwants>[-\s\w]*?)(?:\")(?:(?:\s+id=)(?P<id>[\"'\w]+))?(?: \-\-\>)"
 )
 _COMPILED_REGEX = re.compile(_FIND_CODE_PATTERN, re.MULTILINE)
 
@@ -342,10 +345,25 @@ def for_each_code_block(
             _meta.data["no-main"] = "True"
         # flags are None for now, expected to be populated via regex
         code_result:CodeResult = handle_code(language, code, code_handler, flags=None, meta=_meta)
-        reconstructed = reconstructed.replace(groups["outwants"], result_to_string(code_result, groups["outwants"]))
-        reconstructed = reconstructed.replace(groups["wantstag"], "does")
+        try:
+            reconstructed = reconstructed.replace(groups["outwants"], result_to_string(code_result, groups["outwants"]))
+            reconstructed = reconstructed.replace(groups["wantstag"], "does")
+        except Exception as e:
+            msg = "Could not process code block for file {file}\n code {code}"
+            if meta is not None: raise Exception(msg.format(file=meta.data.get('filename', 'unknown file'), code=code)) from e
+            else: raise e
         return reconstructed
-    return _COMPILED_REGEX.sub(on_match, input)
+    
+    completed_block:str = _COMPILED_REGEX.sub(on_match, input)
+    if "wants=" in completed_block:
+        want_blocks = [ a for a in completed_block.splitlines() if "wants=" in a and "--" in a ]
+        print("Warning: Some code blocks were not processed,\n"
+              "\t likely due to malformed element tag\n"
+              "\t order must be class, wants, id.")
+        print("Unprocessed blocks:\n", "\n\t".join(want_blocks))
+        if meta is not None: print(f"in file {meta.data.get('filename', 'unknown file')}")
+    return completed_block
+
 
 def template_file_setup(base_template_file:str, reveal_js_path:str) -> str:
     with open(base_template_file, "r") as template_file:
