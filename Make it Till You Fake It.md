@@ -52,7 +52,7 @@ You can also mock out modules by using `sys.modules`, even if we do not have the
 ```py
 import sys
 from unittest.mock import Mock
-# Acts as an import of `os`, but os is a mock object not a real one
+# Acts as an import of os, but os is a mock object not a real one
 sys.modules["os"] = Mock() 
 
 from os import sep
@@ -60,7 +60,8 @@ from os import sep
 # sep is also a mock object
 print(f"{sep.__doc__=}")
 ```
-<!-- .element: class="unknown" wants="compiles" -->
+<!-- .element: wants="runs" id="failing" -->
+
 
 [//]: # (Vertical slide)
 

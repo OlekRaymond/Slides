@@ -300,6 +300,7 @@ def result_to_string(result:CodeResult, wants:str) -> str:
 _FIND_CODE_PATTERN = (
     r"(?:^```)(?P<lang>[A-Za-z+]{2,10})(?:.{0,40})$(?:\r?\n)(?P<code>(?:[^\`]){3,}?)(?:```$\n)(?:\<\!\-\- \.element: )(?:(?:class=\")(?P<outclass>[ A-Za-z0-9\-_]*?)(?:\"\s?))?(?P<wantstag>wants)(?:=\")(?P<outwants>[-\s\w]*?)(?:\")(?:(?:\s+id=)(?P<id>[\"'\w]+))?(?: \-\-\>)"
 )
+
 _COMPILED_REGEX = re.compile(_FIND_CODE_PATTERN, re.MULTILINE)
 
 def for_each_code_block(
@@ -357,9 +358,9 @@ def for_each_code_block(
     completed_block:str = _COMPILED_REGEX.sub(on_match, input)
     if "wants=" in completed_block:
         want_blocks = [ a for a in completed_block.splitlines() if "wants=" in a and "--" in a ]
-        print("Warning: Some code blocks were not processed,\n"
-              "\t likely due to malformed element tag\n"
-              "\t order must be class, wants, id.")
+        print("Warning: Some code blocks were not processed.\n"
+              "\t Likely due to malformed element tag: order must be class, wants, id."
+              "\t Note code blocks CANNOT contain backticks")
         print("Unprocessed blocks:\n", "\n\t".join(want_blocks))
         if meta is not None: print(f"in file {meta.data.get('filename', 'unknown file')}")
     return completed_block
