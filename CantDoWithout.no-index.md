@@ -85,9 +85,8 @@ void HandleError() {
     };
     try {
         throw;
-    // Your custom exceptions
+    // Your custom exceptions first
     } catch (const std::nested_exception& e) {
-        // print_std(e);
         try { std::rethrow_if_nested(e); } catch (...) { std::cout << "From: "; HandleError(); }
     } catch (const std::logic_error& e) {
         print_std(e);
@@ -99,16 +98,22 @@ void HandleError() {
         std::cout << "Error: Unknown exception thrown\n";
     }
 }
-void Usage() {
+```
+<!-- .element: class="r-fit" wants="compiles no-main append-className" id="lip" -->
+
+[//]: # (Vertical slide)
+
+```C++
+int main() {
     try {
-        const auto something_that_may_throw = [](){};
+        const auto something_that_may_throw = [](){ throw std::logic_error{"Hello world"}; };
         something_that_may_throw();
     } catch(...) {
         HandleError();
     }
 }
 ```
-<!-- .element: class="r-fit" wants="compiles no-main append className" id="lip" -->
+<!-- .element: class="" wants="compiles append-lip" -->
 
 ---
 
@@ -172,7 +177,15 @@ struct CustomException : std::logic_error {
 
 ---
 
+### Dealing with legacy code
+(compiler warnings)
+
+[//]: # (Vertical slide)
+
 (Some) warnings as errors:
+
+These are nearly always bugs and should never be in the codebase
+
 ```C++
 // -Werror=shadow
 //   requiring shadowing reveals a lack of imagination
@@ -216,15 +229,63 @@ For ease of coping:
 -Werror=return-local-addr
 -Werror=null-dereference
 -Werror=mismatched-dealloc
-```
-
----
-
-### CRTP Name forwarding
+``` 
 
 [//]: # (Vertical slide)
 
-We use CRTP all the time: [strong typing libs](github.com/rollbear/strong_type), [unit libs](), [lifetime logging code^](#crtp-logging-class), [serialisation code]()
+Jason Turner's approach:
+
+- Have all warnings off
+- turn on a single warning
+- remove all occurrences of it
+- turn it into an error
+- repeat
+
+[//]: # (Vertical slide)
+
+Reducing Warnings:
+
+- Find a warning that is not in the codebase
+- Make it an error with `-Werror=NAME`
+- Repeat
+- Full list for 
+    + [gcc](https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html), use `gcc -help=warnings`
+    + [clang](https://clang.llvm.org/docs/DiagnosticsReference.html)
+    + [Useful repo containing most for big 3](https://github.com/Barro/compiler-warnings)
+
+This could be automated
+<!-- TODO! -->
+
+[//]: # (Vertical slide)
+
+Further Reducing Warnings:
+- Compile the code
+- Store a copy of the complier output
+- Fail the pipeline if the occurrences of "warning" has increased from main
+
+Obviously not fool proof, if a variable named `warning` appears in a note it counts.
+
+But it's a very good heuristic!
+
+(Diffing the output is not reasonable because of line changes.)
+
+[//]: # (Vertical slide)
+
+A better solution would be to:
+- Output the compiler warnings in a standard format.
+- Parse the standard format into memory
+- Use some sort of heuristic to determine if the warning is new or old
+    + e.g. Levenshtein distance
+- Give back output based on the number of NEW warnings
+
+
+---
+
+<!-- ### CRTP Name forwarding -->
+
+<!-- [//]: # (Vertical slide) -->
+
+<!-- We use CRTP all the time: [strong typing libs](github.com/rollbear/strong_type), [unit libs](), [lifetime logging code^](#crtp-logging-class), [serialisation code]() -->
 
 ---
 
@@ -232,7 +293,8 @@ We use CRTP all the time: [strong typing libs](github.com/rollbear/strong_type),
 
 ---
 
-Reduction of soft contracts (and documentation) through API design
+### Reduction of soft contracts 
+<sub><sup>(and documentation) through API design</sup></sub>
 
 [//]: # (Vertical slide)
 
@@ -312,10 +374,34 @@ constexpr bool ContainsUnderscores(const std::string_view suite_name) {
 
 ---
 
+### Pipelines
+
+Pipeline too slow?
+- Only build what you need
+    + don't build third party every commit
+- Move to incremental builds
+    + CMake is great! no need to delete the build dir every time
+- Stop compiling after the first problem
+    + `-Wfatal-errors` on gcc and clang
+- Tests should always have ASAN on
+    + Leak detection is optional
+
+---
+
 # Things I have yet to use but kinda fit
 ## (Reflection adjacent)
 
 ---
+
+### Finding if we are in a constructor:
+
+While I was writing CppUnit2Gtest I found that gtest `ASSERT_*` macros do not compile in constructors and destructors.
+
+This was easy to get around with an option but I wanted to keep track of where this hack is required.
+
+So I wrote a macro to find out!
+
+[//]: # (Vertical slide)
 
 ```C++
 #include <string_view>
@@ -330,6 +416,7 @@ constexpr bool is_msvc() noexcept {
     ;
 }
 
+// consteval in C++20
 constexpr bool is_structor_impl(std::string_view name) {
     // "A::A()" format is a constructor
     // "A::~A()" format is a destructor

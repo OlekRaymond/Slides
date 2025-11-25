@@ -309,7 +309,6 @@ def for_each_code_block(
             code_handler: CodeHandlerRegistry | None = None,
         ) -> Markdown:
     previous_language_data: dict[Language, dict[str, Code]] = {}
-    _APPEND_REGEX = re.compile(r"append (?P<id>[\w]+)")
     def on_match(full_match:re.Match[str]) -> str:
         groups = full_match.groupdict()
         reconstructed = full_match.string[full_match.start():full_match.end()]
@@ -320,14 +319,19 @@ def for_each_code_block(
             return reconstructed
         language = RuntimeLanguage(language)
         code :Code = groups["code"]
-        id:str = groups["id"] if "id" in groups.keys() else "last"
+        id:str = groups["id"] if groups["id"] is not None else "last"
+        id = id.replace('"', "").lower()
         if "append" in wants:
             # get the next word after append, else "last"
-            if match := re.match(_APPEND_REGEX, wants):
-                raw_id = match.groupdict().get("id")
-                if raw_id is not None: id_to_append = str(raw_id)
-                else: id_to_append = "last"
+            if (start := wants.find("append-")) > 0:
+                raw_id = wants[start:].removeprefix("append-").replace(" ", "")
+                if len(raw_id) > 0:
+                    id_to_append = str(raw_id).lower()
+                else:
+                    print("wants contains append- but no id was given, possible bug")
+                    id_to_append = "last"
             else: id_to_append = "last"
+
             # Add the code we want to append to this code
             try:
                 code = previous_language_data[language][id_to_append] + code
