@@ -1,0 +1,10 @@
+
+User-agent: *
+Disallow: /
+Allow: /index.html$
+Allow: /$
+Disallow: *.md
+Disallow: *.htm
+Disallow: /build/*
+
+
