@@ -82,22 +82,32 @@ StatusWith<std::size_t> ZlibMessageCompressor::decompressData(ConstDataRange inp
 
 Simplifies into:
 ```C++
-Optional<size_t> DecompressMessage(ConstDataRange input, DataRange output)
+mongo::Optional<size_t> DecompressMessage(mongo::ConstDataRange input, mongo::DataRange output)
 {
     size_t length = output.length();
-    int error_code = ::uncompress(
-            output.data_as_bytes(),
+    int error_code = Zlib::uncompress(
+            output.data_as_byte_ptr(),
             &length,
-            input.data_as_bytes(),
+            input.data_as_byte_ptr(),
             input.length()
         );
 
     if (ret != Z_OK) { return Optional::Error{}; }
     doLogging();
 
-    return {output.length()};
+    return { output.length() };
 }
 ```
+
+[//]: # (Vertical slide)
+
+## Explain ranges/pointers!
+
+- A range (`DataRange`) is a selection or slice into the data stored in an array/list.
+
+- A pointer is a place in memory, they are often used in C to mean arrays, can also be an area a function should write data to.
+
+- Pointers do not have any size and size cannot be attributed to them.
 
 [//]: # (Vertical slide)
 
@@ -116,10 +126,10 @@ Specifically out pointers/output parameters.
 
 - `const_cast` and `reinterpret_cast` are despicable btw
 - `reinterpret_cast` is not UB here
-- `const_cast` is!
+- `const_cast` is!!!!
 - This is not the correct usage of `DataRange`, it should be `output.data<Bytef>()`
-- `DataRange` (publicly) inherits from `ConstDataRange` (it just gets `const_cast`ed a lot)
-- Both ranges only hold bytes anyway so what was the point of `reinterpret_cast`?
+- `DataRange` (publicly) inherits from `ConstDataRange` (data just gets `const_cast`ed a lot)
+- Both ranges only hold bytes anyway so what was the point of the `reinterpret_cast`s???
 
 (maybe don't use MongoDB for user data...?)
 -->
@@ -234,23 +244,54 @@ patterns:
         ...
         $V = $PTR;
 ```
-(Think this could be better btw)
+<small><sub><sup>(Think this could be better btw)</sup></sup></small>
 
 [//]: # (Vertical slide)
 
 This fixes the issue, we can even specify that `$PTR` needs to be something like `size` `length` or `l` with regex.
 
-
-
-
+[//]: # (Vertical slide)
 
 We also could ban defining a function with output parameters to avoid creating bug prone code.
 
+```yml
+patterns:
+      - pattern-either:
+          - pattern: $_ $F(..., $TYPE* $A, ... ) { ... }
+          - pattern: $_ $F(..., $TYPE*, ... ) { ... }
+          - pattern: $_ $F(..., $TYPE* $A, ... );
+          - pattern: $_ $F(..., $TYPE*, ... );
+      - pattern-not: $_ $F(..., const $TYPE* $A, ... ) { ... }
+      - pattern-not: $_ $F(..., const $TYPE* $A, ... );
+```
 
+[//]: # (Vertical slide)
 
+And we can test out semgrep checks:
+```C++
+```
 
+[//]: # (Vertical slide)
 
+Leading to a possible fix:
 
+```C++
+StatusWith<std::size_t> ZlibMessageCompressor::decompressData(ConstDataRange input,
+                                                              DataRange output) {
+    std::size_t length = output.length();
+    int ret = ::uncompress(
+                    output.data<Bytef>(),
+                    &length,
+                    input.data<Bytef>(),
+                    input.length()
+        );
+    output.length() = length;
 
+    if (ret != Z_OK) {
+        return Status{ErrorCodes::BadValue, "Compressed message was invalid or corrupted"};
+    }
 
-
+    counterHitDecompress(input.length(), output.length());
+    return {output.length()};
+}
+```
