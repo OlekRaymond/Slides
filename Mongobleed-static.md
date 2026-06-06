@@ -211,7 +211,7 @@ do_x(
     // No return returns the value at the end of the stack, often 0
 }
 ```
-<!-- .element: class="r-fit" wants="compiles" -->
+<!-- .element: class="r-fit-text r-frame" wants="compiles" -->
 
 
 [//]: # (Vertical slide)
@@ -289,7 +289,7 @@ patterns:
 
 [//]: # (Vertical slide)
 
-This fixes the issue, we can even specify that `$PTR` needs to be something like `size` `length` or `l` with regex.
+This fixes the issue, we can even specify that `$PTR` needs to be something like `size` or `length` with regex.
 
 [//]: # (Vertical slide)
 
@@ -305,12 +305,6 @@ patterns:
       - pattern-not: $_ $F(..., const $TYPE* $A, ... ) { ... }
       - pattern-not: $_ $F(..., const $TYPE* $A, ... );
 ```
-
-
-
-
-[//]: # (Vertical slide)
-
 
 ---
 
@@ -357,27 +351,25 @@ While we're here might as well fix the `DataRange` classes:
 
 // zlib stand-in
 int uncompress(char*, size_t*, const char*, size_t );
-constexpr int Z_OK = 0;
+constexpr int Z_OK = 0; 
 
 namespace mongo {
 
-namespace stand_ins {
-    enum struct Status {
-        Good,
-        NotGood,
-        BadValue
-    };
-    using ErrorCodes = Status;
+enum struct Status {
+    Good,
+    NotGood,
+    BadValue
+};
+using ErrorCodes = Status;
 
-    template<typename T>
-    struct StatusWith {
-        Status status = Status::Good;
-        std::optional<T> t;
-        StatusWith(Status s) : status{s}, t{} {}
-        StatusWith(Status s, [[maybe_unused]] auto _) : status{s}, t{} {}
-        StatusWith(T&& type) : status{Status::Good}, t{type} {}
-    };
-}
+template<typename T>
+struct StatusWith {
+    Status status = Status::Good;
+    std::optional<T> t;
+    StatusWith(Status s) : status{s}, t{} {}
+    StatusWith(T&& type) : status{Status::Good}, t{type} {} 
+
+};
 
 template <typename T>
 concept isByte = sizeof(T) == 1 && std::is_integral_v<T> && (!std::is_same_v<T, bool>);
@@ -386,22 +378,12 @@ template <typename T>
 concept ByteLike = isByte<T>;
 
 template <typename T>
-concept ContiguousContainerOfByteLike = requires (T t){ t.data(); isByte<decltype(*(t.data()))>; };
+concept ContiguousContainerOfByteLike = requires (T t){isByte<decltype(*(t.data()))>; };
 
 
 template<bool is_const>
 class AnyDataRange {
-protected:
-    
-    template <typename T>
-    using DataOp = decltype(std::declval<T>().data());
-    template <typename T>
-    using SizeOp = decltype(std::declval<T>().size());
-    template <typename T>
-    using ValueTypeOp = typename T::value_type;
-    
-
-    public:
+public:
     using byte_type = char;
     using held_type_p = std::conditional_t<is_const, const byte_type*, byte_type*>;
 
@@ -456,29 +438,29 @@ protected:
     AnyDataRange(ByteLike auto (&arr)[N], std::ptrdiff_t debug_offset = 0)
         : AnyDataRange(arr, N, debug_offset) {}
 
-    template <typename ByteLike = byte_type>
+    template <ByteLike ToCastTo = byte_type>
     auto* data() const noexcept {
-        if constexpr (std::is_same_v<ByteLike, byte_type>) {
+        if constexpr (std::is_same_v<ToCastTo, byte_type>) {
             return _begin; 
         } else {
-            return reinterpret_cast<const ByteLike*>(_begin);
+            return reinterpret_cast<const ToCastTo*>(_begin);
         }
     }
 
-    template <typename ByteLike = byte_type>
+    template <ByteLike ToCastTo = byte_type>
     auto* data() noexcept {
-        if constexpr (std::is_same_v<ByteLike, byte_type>) {
+        if constexpr (std::is_same_v<ToCastTo, byte_type>) {
             return _begin; 
         } else {
-            return reinterpret_cast<ByteLike*>(_begin);
+            return reinterpret_cast<ToCastTo*>(_begin);
         }
     }
 
     size_t length() const noexcept {
-        // Assume silences a compiler warning
-        //  Guarenteed to be the case because of 
+        // Guarenteed to be the case because of 
         //   invariant(end >= begin)
         //  in constructor
+        // Also silences a -Wconversion warning
         [[assume((_end - _begin) > 0)]];
         return static_cast<size_t>(_end - _begin);
     }
@@ -599,10 +581,9 @@ StatusWith<std::size_t> decompressData(ConstDataRange input,
     output = {output.data(), length};
 
     if (ret != Z_OK) {
-        return Status{ErrorCodes::BadValue, "Compressed message was invalid or corrupted"};
+        return Status{ErrorCodes::BadValue }; //, "Compressed message was invalid or corrupted"};
     }
 
-    // counterHitDecompress(input.length(), output.length());
     return {output.length()};
 }
 

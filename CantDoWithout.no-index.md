@@ -366,7 +366,7 @@ constexpr bool ContainsUnderscores(const std::string_view suite_name) {
 }
 
 #define SomeMacro(item)                                     \
-    static_assert(!ContainsUnderscores(#item),              \
+    static_assert(!::ContainsUnderscores(#item),              \
         "item names are not allowed to contain underscores" \
     );                                                      \
     NormalMacro...
