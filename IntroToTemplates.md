@@ -5,11 +5,18 @@ The original generics
 
 ---
 
-- We often want code to be as reusable as possible
-- e.g. we don't want to write, `is_even`, for ints, unsigned ints, longs, unsigned longs, floats, doubles, long doubles, int_ptr,fractions, decimals/big numbers, complex numbers, element-wise vectors/simd vectors, unit types, strong types, pointers to above values, ...
-<!-- .element: class="no-wrap" -->
-- We want `is_even` to take (almost) anything and do something with it
-- If it can't do something reasonable, we want to compile error
+We often want code to be as reusable as possible
+
+e.g. we don't want to write, `is_even`, for:
+
+ints, unsigned ints, longs, unsigned longs, floats, doubles, long doubles, int_ptr,fractions, decimals/big numbers, complex numbers, element-wise vectors/simd vectors, unit types, strong types, pointers to above values, ...
+<!-- .element: class="no-wrap fragment" -->
+
+We want `is_even` to take (almost) anything and do something with it
+<!-- .element: class="fragment" -->
+
+If it can't do something reasonable, we want to compile error
+<!-- .element: class="fragment" -->
 
 [//]: # (Vertical slide)
 
@@ -28,6 +35,8 @@ bool is_even(const std::float64_t to_check) { return is_even(static_cast<int>(to
 bool is_even(const std::float128_t to_check) { return is_even(static_cast<int>(to_check)); }
 bool is_even(const std::bfloat16_t to_check) { return is_even(static_cast<int>(to_check)); }
 ```
+<!-- .element: class="r-fit-text big" -->
+
 [//]: # (Vertical slide)
 But maybe you think this is okay:
 - maybe we do want to handle floating point values differently to integers
@@ -218,59 +227,37 @@ It's important to remember constraints and concepts don't _do_ anything.
 **They are for better error messages**, if you don't error, there is no point
 
 ---
-<section data-auto-animate>
-If we are intending to take a class that has the methods foo and bar we can:
-  <pre data-id="code-animation"><code data-trim data-line-numbers>
-template &lt; typename T &gt;
-void foo(const T& foobar)
-// Use a requires clause:
-requires(const T& t) { t.foo(); t.bar(); }
-{
-    // Code for foo...
-}
-  </code></pre>
-</section>
-<section data-auto-animate>
-If we are intending to take a class that has the methods foo and bar we can:
-  <pre data-id="code-animation"><code data-trim data-line-numbers>
-    // Use a concept:
-    template &lt; typename T &gt;
-    concept FooBar =
-    requires(const T& t) { t.foo(); t.bar(); }
-    ;
-    void foo(FooBar const auto& foobar)
-    {
-        // Code for foo...
-    }
-  </code></pre>
-</section>
-
----
 
 [//]: # (Vertical slide)
-<!-- .element: class="r-stack" -->
-
-If we are intending to take a class that has the methods foo and bar we can:
-
+<!-- .element: data-auto-animate NOclass="r-stack" -->
 ```C++
 template<typename T>
 void foo(const T& foobar)
+
 // Use a requires clause:
 requires(const T& t) { t.foo(); t.bar(); }
 {
     // Code for foo...
 }
 ```
-<!-- .element: class="fragment fade-out" data-fragment-index="0" -->
+<!-- .element: data-id="code-animation" -->
+
+[//]: # (Vertical slide)
+<!-- .element: data-auto-animate NOclass="r-stack" -->
 ```C++
+template<typename T>;
+concept FooBar = requires(const T& t) { t.foo(); t.bar(); };
+
 // Use a concept:
 void foo(FooBar const auto& foobar)
 {
     // Code for foo...
 }
 ```
-<!-- .element: class="fragment fade-in" data-fragment-index="0" -->
+<!-- .element: data-id="code-animation" -->
+
+[//]: # (Vertical slide)
 
 
-<!-- I want one block to disapper and be replaced by another, ::: fragment  -->
+<!-- I want one block to disappear and be replaced by another, ::: fragment  -->
 

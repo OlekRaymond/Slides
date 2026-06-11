@@ -30,6 +30,15 @@
 				&:first-of-type { padding-left: 0; }
 			}
 		}
+		.no-wrap {
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: clip;
+			text-align: left;
+			padding-left: 0;
+			padding: 2% 0 2% 3%;
+			width: 120%;
+		}
 		</style>
 	</head>
 	<body>
@@ -50,7 +59,8 @@
 		<script>
 			Reveal.initialize({
 				hash: true,
-				plugins: [ RevealMarkdown, RevealHighlight, RevealNotes ]
+				plugins: [ RevealMarkdown, RevealHighlight, RevealNotes ],
+				slideAttributes: true
 			});
 		</script>
 	</body>

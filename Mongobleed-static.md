@@ -368,7 +368,6 @@ struct StatusWith {
     std::optional<T> t;
     StatusWith(Status s) : status{s}, t{} {}
     StatusWith(T&& type) : status{Status::Good}, t{type} {} 
-
 };
 
 template <typename T>
@@ -590,5 +589,4 @@ StatusWith<std::size_t> decompressData(ConstDataRange input,
 }
 ```
 <!-- .element: class="r-fit" wants="compiles" -->
-
 
