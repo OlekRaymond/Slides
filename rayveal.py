@@ -1,5 +1,12 @@
+"""
+Parses a collection of markdown files and turns them into a website for presenting.
 
-from typing import Protocol, Callable, LiteralString, override, Final, Iterable, Any
+- Lets the user know if a codeblock was expected to compile/run but didn't
+- Annotates the codeblock with red if it failed, green if it passed
+- Supported languages are C++ and Python
+"""
+
+import typing
 from dataclasses import dataclass
 import subprocess
 from os import getenv as get_env
@@ -10,15 +17,6 @@ import base64
 import zlib
 import io
 
-# parse slides
-# if code block:
-#   if python:
-#       try exec; green; expect: red
-#   if C++:
-#       add to template.cpp;
-#       compile
-#       if compiles: green; else red;
-
 type Code = str
 type Markdown = str
 type HTML = str
@@ -28,14 +26,14 @@ class CompileResult:
     compiler_output: str
     return_code: int
     @property
-    def compiles(self): return self.return_code == 0
+    def compiles(self) -> bool: return self.return_code == 0
 
 @dataclass
 class RunResult:
     run_output: str
     return_code: int
     @property
-    def runs(self): return self.return_code == 0
+    def runs(self) -> bool: return self.return_code == 0
 
 @dataclass
 class CodeResult:
@@ -52,13 +50,13 @@ class CodeResult:
         return False
 
 class RuntimeLanguage:
-    def __init__(self, string:str) -> None:
-        if len(string) > 10 or ' ' in string:
+    def __init__(self, language_name:str) -> None:
+        if len(language_name) > 10 or ' ' in language_name:
             raise RuntimeError("Language did not fill appropriate requirements")
-        match string.lower():
+        match language_name.lower():
             case "cpp" | "c++" | "cxx": self._value = "cpp"
             case "python" | "py": self._value = "python"
-            case _: self._value = string.lower()
+            case _: self._value = language_name.lower()
 
     def __str__(self) -> str:
         return self._value
@@ -76,32 +74,32 @@ class CompileExecFlags:
     """
     Flags to pass to the compiler or interpreter
     """
-    flags: set[str] | dict[str,Any] = {}
+    flags: set[str] | dict[str, typing.Any] = {}
 
 class MetaData:
     data: dict[str, str] = {}
     def __repr__(self) -> str:
         return self.data.__repr__()
 
-type Handler  = Callable[[str, CompileExecFlags|None, MetaData|None], CodeResult]
-type Language = LiteralString | RuntimeLanguage
+type Handler  = typing.Callable[[str, CompileExecFlags|None, MetaData|None], CodeResult]
+type Language = typing.LiteralString | RuntimeLanguage
 
-class CodeHandlerRegistry(Protocol):
+class CodeHandlerRegistry(typing.Protocol):
     def handle_code(self, language:RuntimeLanguage, code:str,
                     flags: CompileExecFlags|None = None,
                     meta:MetaData| None = None) -> CodeResult: ...
-    def add_language(self, language: LiteralString, handler: Handler) -> "CodeHandlerRegistry": ...
+    def add_language(self, language: typing.LiteralString, handler: Handler) -> "CodeHandlerRegistry": ...
 
 class DefaultHandler(CodeHandlerRegistry):
     def __init__(self):
         self.registry: dict[RuntimeLanguage, Handler] = {}
 
-    @override
-    def add_language(self, language:LiteralString, handler:Handler) -> "DefaultHandler":
+    @typing.override
+    def add_language(self, language:typing.LiteralString, handler:Handler) -> "DefaultHandler":
         self.registry.update({RuntimeLanguage(str(language)): handler})
         return self
 
-    @override
+    @typing.override
     def handle_code(self,
                     language: RuntimeLanguage,
                     code:str,
@@ -117,7 +115,7 @@ class DefaultHandler(CodeHandlerRegistry):
                 )
         return handler(code, flags, meta)
 
-_DEFAULT_HANDLER:Final = DefaultHandler()
+_DEFAULT_HANDLER:typing.Final = DefaultHandler()
 
 def handle_code(
         language: RuntimeLanguage,
@@ -234,12 +232,12 @@ def handle_python(code:str,
             return
         exit_code = 1
         exit_str = value
-    def mock_open(file:str, mode:str="r", *args:Any, **kwargs:Any):
+    def mock_open(file:str, mode:str="r", *args:typing.Any, **kwargs:typing.Any):
         to_return = "foo bar baz".encode()
         return io.BufferedReader(io.BytesIO(to_return), len(to_return))
     
     _locals = flags.flags.get("locals", None) if flags and isinstance(flags.flags, dict) else None
-    _globals:dict[str,Any] = flags.flags.get("globals", {}) if flags and isinstance(flags.flags, dict) else {}
+    _globals:dict[str,typing.Any] = flags.flags.get("globals", {}) if flags and isinstance(flags.flags, dict) else {}
     assert isinstance(_globals, dict)
     _globals.update({"print": mock_print, "exit":mock_exit, "open": mock_open})
     try:
@@ -397,8 +395,7 @@ def _clone_reveal_js(*,
     dest_dir = destination_folder if destination_folder.endswith("/") else destination_folder + "/"
     if os.path.exists(destination_folder):
         return dest_dir
-    # We only need "css", "dist", "plugin" folders
-    #  TODO: Only Get required folders
+    #  TODO: Only get the required folders ("css", "dist", "plugin")
     clone = subprocess.run(
         (_GIT_PATH, "clone", "-b", version_tag, "-q", "--depth", "1", "--single-branch", repo_url , destination_folder),
         stderr=subprocess.PIPE
@@ -408,7 +405,7 @@ def _clone_reveal_js(*,
     print(f"Could not clone reveal.js, got {clone.stderr}, using CDN instead")
     return f"https://cdnjs.cloudflare.com/ajax/libs/reveal.js/{version_tag}/"
 
-_REVEAL_JS_PATH:Final = _clone_reveal_js()
+_REVEAL_JS_PATH:typing.Final = _clone_reveal_js()
 _IGNORE_FILE_STRING = "<!-- .ignore -->"
 
 def create_markdown_data(input_file_name:str) -> Markdown|None:
@@ -450,7 +447,7 @@ _HTML ="""<html>
 </html>
 """
 
-def create_contents_index(to_link_to:Iterable[str]) -> None:
+def create_contents_index(to_link_to:typing.Iterable[str]) -> None:
     indexable = ['<li><a href="{link}">{link}</a></li>'.format(link=clean_link(link) + ".html") for link in to_link_to if not ("no-index" in link) ]
     comments = ['<!-- {link} -->'.format(link=clean_link(link) + ".html") for link in to_link_to if ("no-index" in link) ]
     links_str = "\n".join(indexable + comments)

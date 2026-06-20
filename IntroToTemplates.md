@@ -200,6 +200,77 @@ class Queue {
     std::array<T, Size> holder;
 };
 ```
+---
+
+## Templates for safety
+
+[//]: # (Vertical slide)
+
+If we have a function that sometimes can return a planet and sometimes doesn't we can:
+
+[//]: # (Vertical slide)
+
+Use a out-parameter reference
+```C++
+/// returns true if populated
+bool CreatePlanet(const Position& pos, Planet& to_create)
+{
+    if (pos.empty()) {
+        to_create = Something();
+        return true;
+    }
+    return false;
+}
+...
+Planet earth; // create bomb
+bool created = CreatePlanet({0.0, 0.0, 0.0}, earth);
+if (created) { // Ask the bomb guy if they were successful
+    // bomb defused
+} else {
+    // bomb remains, do not use earth!
+}
+```
+[//]: # (Vertical slide)
+Use a out-parameter reference
+```C++
+/// returns true if populated
+bool CreatePlanet(const Position& pos, Planet& to_create)
+{
+    if (pos.empty()) {
+        to_create = Something();
+        return true;
+    }
+    return false;
+}
+...
+Planet earth{}; // create an expensive object
+bool created = CreatePlanet({0.0, 0.0, 0.0}, earth); // Create another expensive object 
+if (created) {
+    // earth created
+} else {
+    // earth not created but can be used without security issue
+}
+```
+[//]: # (Vertical slide)
+
+Use an out-parameter pointer and create object on heap
+```C++
+void CreatePlanet(const Position& pos, Planet** to_create)
+{
+    *to_create = new Planet{};
+}
+...
+Planet* earth_p = nullptr; // create an expensive object
+CreatePlanet({0.0, 0.0, 0.0}, &earth_p); // Create another expensive object 
+if (earth_p == nullptr) {
+    // earth created
+} else {
+    // earth not created, will (likely) crash if used
+}
+```
+
+
+
 
 ---
 
@@ -217,7 +288,7 @@ If it doesn't link make sure your template is in a header file or module
 We can let the compiler try to call the thing and error out
 But we can do better by constraining a type
 <!-- .element: class="fragment" -->
-<sub><sup>(Personally I don't mind the old error messages but I know I'm a freak and the new ones are better)</sup></sub>
+<sub><sup>(Personally I don't mind the old error messages but I know I'm a freak and the new ones are much better)</sup></sub>
 <!-- .element: class="fragment" -->
 
 [//]: # (Vertical slide)
@@ -227,8 +298,6 @@ It's important to remember constraints and concepts don't _do_ anything.
 **They are for better error messages**, if you don't error, there is no point
 
 ---
-
-[//]: # (Vertical slide)
 <!-- .element: data-auto-animate NOclass="r-stack" -->
 ```C++
 template<typename T>
@@ -245,7 +314,7 @@ requires(const T& t) { t.foo(); t.bar(); }
 [//]: # (Vertical slide)
 <!-- .element: data-auto-animate NOclass="r-stack" -->
 ```C++
-template<typename T>;
+template<typename T>
 concept FooBar = requires(const T& t) { t.foo(); t.bar(); };
 
 // Use a concept:
@@ -256,8 +325,5 @@ void foo(FooBar const auto& foobar)
 ```
 <!-- .element: data-id="code-animation" -->
 
-[//]: # (Vertical slide)
-
-
-<!-- I want one block to disappear and be replaced by another, ::: fragment  -->
+<!-- I want one block to disappear and be replaced by another, is a challenge though :/ -->
 
