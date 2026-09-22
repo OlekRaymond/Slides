@@ -27,14 +27,14 @@ Output comes as two or more html files, each slide deck is given it's own html f
 ## Usage:
 
 ### Example 1:
-`python3 BuildSlides.py example.md`
+`python3 rayveal.py example.md`
 outputs index.html and no other html files
 
 ### Example 2:
-`python3 BuildSlides.py example1.md example2.md` outputs `index.html` which contains links to, the created, `example1.html` and `example2.html`
+`python3 rayveal.py example1.md example2.md` outputs `index.html` which contains links to, the created, `example1.html` and `example2.html`
 
 ### Example 3:
-`python3 BuildSlides.py *.md` has the exact same behaviour as if the user had typed out all the markdown files in the current directory
+`python3 rayveal.py *.md` has the exact same behaviour as if the user had typed out all the markdown files in the current directory
 
 ### Example 4:
 For use without the python file on your hard drive use: `curl -L https://raw.githubusercontent.com/OlekRaymond/Slides/refs/heads/main/BuildSlides.py > BuildSlides.py` and also clone the template if not using a custom one with `curl -L https://raw.githubusercontent.com/OlekRaymond/Slides/refs/heads/main/TemplateSlides.html.in > TemplateSlides.html.in` then run as usual with the commands above.
