@@ -1,3 +1,4 @@
+#! /usr/bin/env python3 
 """
 Parses a collection of markdown files and turns them into a website for presenting.
 
@@ -155,7 +156,12 @@ _CPP_COMPILER:str = _get_cpp_compiler()
 
 def clean_link(link:str) -> str:
     import random
-    link = link.replace(".no-index.", ".").replace("no-index", "")
+    link = (link
+         .replace(".no-index.", ".")
+         .replace("no-index", "")
+         .replace(".noindex.", "")
+         .replace("noindex", "")
+    )
     link = link.rsplit(".", 1)[0].replace(" ", "_")
     if len(link) <= 2:
         return (
@@ -447,9 +453,12 @@ _HTML ="""<html>
 </html>
 """
 
+def should_index(link:str) -> bool:
+    return ("noindex" in link) or ("no-index" in link)
+
 def create_contents_index(to_link_to:typing.Iterable[str]) -> None:
-    indexable = ['<li><a href="{link}">{link}</a></li>'.format(link=clean_link(link) + ".html") for link in to_link_to if not ("no-index" in link) ]
-    comments = ['<!-- {link} -->'.format(link=clean_link(link) + ".html") for link in to_link_to if ("no-index" in link) ]
+    indexable = ['<li><a href="{link}">{link}</a></li>'.format(link=clean_link(link) + ".html") for link in to_link_to if not should_index(link) ]
+    comments = ['<!-- {link} -->'.format(link=clean_link(link) + ".html") for link in to_link_to if should_index(link)  ]
     links_str = "\n".join(indexable + comments)
     with open("index.html", "w") as index_file:
         index_file.write(_HTML.format(links_str=links_str))
